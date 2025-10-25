@@ -18,18 +18,18 @@ predictive-mental-health-smartwatch/
 ├── README.md
 ├── LICENSE
 ├── requirements.txt
-├── docs/ # Proposal, reports, user docs
-├── data/ # Example + processed datasets (do not share personal data!)
-├── notebooks/ # Data exploration and model building
+├── docs/                   # Proposal, reports, user docs
+├── data/                   # Example + processed datasets (do not share personal data!)
+├── notebooks/              # Data exploration and model building
 ├── src/
-│     ├── data/ # Data loaders/preprocessors
-│     ├── models/ # ML/AI models (HRV, mood, crisis)
-│     ├── ai/ # Conversational AI code
-│     ├── mobile/ # Mobile app / Wear OS integration
-│     └── utils/ # Helpers and configuration files
-├── tests/ # Unit and integration tests
-├── scripts/ # Train/evaluate/serve scripts
-└── deployment/ # Docker, cloud config, release materials
+│   ├── data/               # Data loaders/preprocessors
+│   ├── models/             # ML/AI models (HRV, mood, crisis)
+│   ├── ai/                 # Conversational AI code
+│   ├── mobile/             # Mobile app / Wear OS integration
+│   └── utils/              # Helpers and configuration files
+├── tests/                  # Unit and integration tests
+├── scripts/                # Train/evaluate/serve scripts
+└── deployment/             # Docker, cloud config, release materials
 
 
 ## Getting Started
