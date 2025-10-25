@@ -22,11 +22,11 @@ predictive-mental-health-smartwatch/
 ├── data/ # Example + processed datasets (do not share personal data!)
 ├── notebooks/ # Data exploration and model building
 ├── src/
-│ ├── data/ # Data loaders/preprocessors
-│ ├── models/ # ML/AI models (HRV, mood, crisis)
-│ ├── ai/ # Conversational AI code
-│ ├── mobile/ # Mobile app / Wear OS integration
-│ └── utils/ # Helpers and configuration files
+│     ├── data/ # Data loaders/preprocessors
+│     ├── models/ # ML/AI models (HRV, mood, crisis)
+│     ├── ai/ # Conversational AI code
+│     ├── mobile/ # Mobile app / Wear OS integration
+│     └── utils/ # Helpers and configuration files
 ├── tests/ # Unit and integration tests
 ├── scripts/ # Train/evaluate/serve scripts
 └── deployment/ # Docker, cloud config, release materials
