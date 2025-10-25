@@ -14,6 +14,7 @@ This project aims to develop an AI-powered system that continuously monitors men
 - Privacy-first design: encrypted, user-controllable, no personal data sharing by default
 
 ## Repository Structure
+```bash
 predictive-mental-health-smartwatch/
 ├── README.md
 ├── LICENSE
@@ -30,7 +31,7 @@ predictive-mental-health-smartwatch/
 ├── tests/                  # Unit and integration tests
 ├── scripts/                # Train/evaluate/serve scripts
 └── deployment/             # Docker, cloud config, release materials
-
+```
 
 ## Getting Started
 
