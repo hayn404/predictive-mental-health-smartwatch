@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,20 +9,22 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  TextInput,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow } from '@/constants/theme';
-import { useCheckin } from '@/hooks/useHealthData';
+import { useCheckin, useHealthData } from '@/hooks/useHealthData';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { getCheckinHistory } from '@/services/mockData';
 
 export default function CheckinScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isRecording, transcript, isAnalyzing, result, waveAmplitudes, startRecording, stopAndAnalyze, reset } = useCheckin();
-  const history = getCheckinHistory();
+  const { isRecording, isTranscribing, transcript, isAnalyzing, result, waveAmplitudes, recordingDuration, startRecording, stopAndAnalyze, submitText, reset } = useCheckin();
+  const { checkinHistory: history } = useHealthData();
+  const [inputMode, setInputMode] = useState<'voice' | 'text'>('text');
+  const [textInput, setTextInput] = useState('');
   const micPulse = useRef(new Animated.Value(1)).current;
   const waveAnims = useRef(waveAmplitudes.map(() => new Animated.Value(4))).current;
 
@@ -90,72 +92,147 @@ export default function CheckinScreen() {
           </View>
         </View>
 
-        {!result && !isAnalyzing && (
+        {!result && !isAnalyzing && !isTranscribing && (
           <View style={styles.voiceInteractionArea}>
-            {/* Mic Box */}
-            <View style={styles.micGlowContainer}>
+            {/* Mode Toggle */}
+            <View style={styles.modeToggle}>
               <TouchableOpacity
-                style={styles.micButton}
-                onPress={isRecording ? stopAndAnalyze : startRecording}
-                activeOpacity={0.85}
+                style={[styles.modeBtn, inputMode === 'text' && styles.modeBtnActive]}
+                onPress={() => setInputMode('text')}
               >
-                <MaterialIcons name="mic" size={36} color={Colors.sageGreen} />
+                <MaterialIcons name="edit" size={18} color={inputMode === 'text' ? Colors.warmWhite : Colors.textMuted} />
+                <Text style={[styles.modeBtnText, inputMode === 'text' && styles.modeBtnTextActive]}>Type</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeBtn, inputMode === 'voice' && styles.modeBtnActive]}
+                onPress={() => setInputMode('voice')}
+              >
+                <MaterialIcons name="mic" size={18} color={inputMode === 'voice' ? Colors.warmWhite : Colors.textMuted} />
+                <Text style={[styles.modeBtnText, inputMode === 'voice' && styles.modeBtnTextActive]}>Voice</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Waveform */}
-            <View style={styles.waveform}>
-              {waveAmplitudes.slice(0, 15).map((amp, i) => (
-                <Animated.View
-                  key={i}
-                  style={[
-                    styles.waveBar,
-                    {
-                      height: waveAnims[i],
-                      backgroundColor: '#C4B5FD',
-                      opacity: isRecording ? 1 : 0.5,
-                    },
-                  ]}
-                />
-              ))}
-            </View>
-            <Text style={styles.recordingActiveText}>• VOICE RECORDING ACTIVE</Text>
-
-            {/* Transcript Card */}
-            <View style={styles.transcriptCard}>
-              <View style={styles.transcriptHeader}>
-                <View style={styles.liveIndicator}>
-                  <View style={[styles.liveIndicatorDot, { backgroundColor: isRecording ? '#A78BFA' : Colors.warmGray400 }]} />
-                  <Text style={[styles.liveIndicatorText, { color: isRecording ? '#A78BFA' : Colors.textMuted }]}>LIVE TRANSCRIPTION</Text>
+            {inputMode === 'voice' ? (
+              <>
+                {/* Mic Box */}
+                <View style={styles.micGlowContainer}>
+                  <TouchableOpacity
+                    style={[styles.micButton, isRecording && { backgroundColor: '#FEE2E2' }]}
+                    onPress={isRecording ? stopAndAnalyze : startRecording}
+                    activeOpacity={0.85}
+                    disabled={isTranscribing}
+                  >
+                    <MaterialIcons
+                      name={isRecording ? 'stop' : 'mic'}
+                      size={36}
+                      color={isRecording ? '#EF4444' : Colors.sageGreen}
+                    />
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.privacyProtectedBadge}>
-                  <Text style={styles.privacyProtectedText}>Privacy Protected</Text>
+
+                {/* Recording duration */}
+                {isRecording && (
+                  <Text style={styles.durationText}>
+                    {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                  </Text>
+                )}
+
+                {/* Waveform */}
+                <View style={styles.waveform}>
+                  {waveAmplitudes.slice(0, 15).map((_amp, i) => (
+                    <Animated.View
+                      key={i}
+                      style={[
+                        styles.waveBar,
+                        {
+                          height: waveAnims[i],
+                          backgroundColor: isRecording ? '#C4B5FD' : '#E5E7EB',
+                          opacity: isRecording ? 1 : 0.5,
+                        },
+                      ]}
+                    />
+                  ))}
                 </View>
-              </View>
-              <Text style={styles.transcriptContent}>
-                {transcript || (!isRecording ? 'Tap the microphone to start...' : '')}
-                {isRecording && <Text style={{ color: '#C4B5FD', fontSize: FontSize.lg }}> |</Text>}
-              </Text>
-            </View>
+                <Text style={styles.recordingActiveText}>
+                  {isRecording ? '• RECORDING' : isTranscribing ? '• TRANSCRIBING...' : 'TAP TO RECORD'}
+                </Text>
 
-            {/* Main Action Button */}
-            <TouchableOpacity style={styles.endButton} onPress={stopAndAnalyze}>
-              <MaterialIcons name="check-circle-outline" size={20} color={Colors.warmWhite} />
-              <Text style={styles.endButtonText}>End & Analyze</Text>
-            </TouchableOpacity>
+                {/* Transcript / Status Card */}
+                <View style={styles.transcriptCard}>
+                  <View style={styles.transcriptHeader}>
+                    <View style={styles.liveIndicator}>
+                      <View style={[styles.liveIndicatorDot, { backgroundColor: isRecording ? '#EF4444' : isTranscribing ? '#F59E0B' : Colors.warmGray400 }]} />
+                      <Text style={[styles.liveIndicatorText, { color: isRecording ? '#EF4444' : isTranscribing ? '#F59E0B' : Colors.textMuted }]}>
+                        {isRecording ? 'RECORDING AUDIO' : isTranscribing ? 'WHISPER TRANSCRIBING' : 'READY'}
+                      </Text>
+                    </View>
+                    <View style={styles.privacyProtectedBadge}>
+                      <Text style={styles.privacyProtectedText}>Encrypted</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.transcriptContent}>
+                    {isTranscribing ? 'Sending audio to Whisper for transcription...'
+                      : transcript || (isRecording ? 'Speak naturally about how you feel...' : 'Tap the microphone to start recording')}
+                  </Text>
+                </View>
 
-            {/* Secondary Controls */}
-            <View style={styles.secondaryControls}>
-              <TouchableOpacity style={styles.controlItem}>
-                <MaterialIcons name="mic-off" size={20} color={Colors.textMuted} />
-                <Text style={styles.controlLabel}>MUTE</Text>
-              </TouchableOpacity>
-              <View style={styles.controlDivider} />
-              <TouchableOpacity style={styles.controlItem}>
-                <MaterialIcons name="info-outline" size={20} color={Colors.textMuted} />
-                <Text style={styles.controlLabel}>TIPS</Text>
-              </TouchableOpacity>
-            </View>
+                {/* Action Buttons */}
+                {isRecording && (
+                  <TouchableOpacity style={styles.endButton} onPress={stopAndAnalyze}>
+                    <MaterialIcons name="check-circle-outline" size={20} color={Colors.warmWhite} />
+                    <Text style={styles.endButtonText}>Stop & Analyze</Text>
+                  </TouchableOpacity>
+                )}
+
+                {!isRecording && !isTranscribing && (
+                  <View style={styles.voiceHintContainer}>
+                    <MaterialIcons name="info-outline" size={14} color={Colors.textMuted} />
+                    <Text style={styles.voiceHintText}>
+                      Requires Whisper API key configured in Settings. Audio is recorded, sent to Whisper for transcription, then analyzed by the LLM.
+                    </Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Text Input Mode */}
+                <View style={styles.textInputIcon}>
+                  <MaterialIcons name="chat-bubble-outline" size={36} color={Colors.violet} />
+                </View>
+                <Text style={styles.textInputPrompt}>How are you feeling today?</Text>
+                <Text style={styles.textInputSubtext}>Share your thoughts — Seren will listen and respond with care.</Text>
+
+                <View style={styles.transcriptCard}>
+                  <View style={styles.transcriptHeader}>
+                    <View style={styles.liveIndicator}>
+                      <View style={[styles.liveIndicatorDot, { backgroundColor: textInput.trim() ? '#A78BFA' : Colors.warmGray400 }]} />
+                      <Text style={[styles.liveIndicatorText, { color: textInput.trim() ? '#A78BFA' : Colors.textMuted }]}>YOUR THOUGHTS</Text>
+                    </View>
+                    <View style={styles.privacyProtectedBadge}>
+                      <Text style={styles.privacyProtectedText}>Privacy Protected</Text>
+                    </View>
+                  </View>
+                  <TextInput
+                    style={styles.textInputField}
+                    placeholder="I've been feeling..."
+                    placeholderTextColor={Colors.textMuted}
+                    multiline
+                    value={textInput}
+                    onChangeText={setTextInput}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.endButton, !textInput.trim() && { opacity: 0.5 }]}
+                  onPress={() => { submitText(textInput); setTextInput(''); }}
+                  disabled={!textInput.trim()}
+                >
+                  <MaterialIcons name="check-circle-outline" size={20} color={Colors.warmWhite} />
+                  <Text style={styles.endButtonText}>Analyze</Text>
+                </TouchableOpacity>
+              </>
+            )}
 
             {/* Footer */}
             <View style={styles.bottomFooter}>
@@ -167,14 +244,24 @@ export default function CheckinScreen() {
           </View>
         )}
 
-        {/* Analyzing */}
-        {isAnalyzing && (
+        {/* Transcribing / Analyzing */}
+        {(isTranscribing || isAnalyzing) && (
           <View style={styles.analyzingContainer}>
             <Animated.View style={styles.analyzingIcon}>
-              <MaterialIcons name="psychology" size={44} color={Colors.violet} />
+              <MaterialIcons
+                name={isTranscribing ? 'hearing' : 'psychology'}
+                size={44}
+                color={Colors.violet}
+              />
             </Animated.View>
-            <Text style={styles.analyzingText}>Analyzing your check-in...</Text>
-            <Text style={styles.analyzingSubtext}>Understanding context, tone & patterns</Text>
+            <Text style={styles.analyzingText}>
+              {isTranscribing ? 'Transcribing your voice...' : 'Analyzing your check-in...'}
+            </Text>
+            <Text style={styles.analyzingSubtext}>
+              {isTranscribing
+                ? 'Whisper AI is converting your speech to text'
+                : 'Cross-referencing your words with biometric data'}
+            </Text>
           </View>
         )}
 
@@ -193,6 +280,24 @@ export default function CheckinScreen() {
                   </Text>
                 </View>
               </View>
+              {/* AI Empathetic Response */}
+              {result?.empathyResponse ? (
+                <View style={styles.empathySection}>
+                  <View style={styles.empathyHeader}>
+                    <MaterialIcons name="psychology" size={16} color={Colors.violet} />
+                    <Text style={styles.empathyLabel}>Seren</Text>
+                  </View>
+                  <Text style={styles.empathyText}>{result.empathyResponse}</Text>
+                </View>
+              ) : null}
+
+              {/* Follow-up question */}
+              {result?.followUp ? (
+                <View style={styles.followUpSection}>
+                  <Text style={styles.followUpText}>{result.followUp}</Text>
+                </View>
+              ) : null}
+
               <Text style={styles.resultSubtitle}>Key Insights</Text>
               {result?.insights?.map((insight: string, i: number) => (
                 <View key={i} style={styles.insightItem}>
@@ -503,6 +608,44 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 20,
   },
+  empathySection: {
+    backgroundColor: Colors.violet + '08',
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.violet,
+  },
+  empathyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  empathyLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold,
+    color: Colors.violet,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  empathyText: {
+    fontSize: FontSize.sm,
+    color: Colors.textPrimary,
+    lineHeight: 22,
+  },
+  followUpSection: {
+    backgroundColor: Colors.sageGreen + '10',
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  followUpText: {
+    fontSize: FontSize.sm,
+    color: Colors.sageGreenDark,
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
   newCheckinBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -565,5 +708,85 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.violetDark,
     fontWeight: FontWeight.medium,
+  },
+  modeToggle: {
+    flexDirection: 'row',
+    backgroundColor: Colors.warmWhite,
+    borderRadius: Radius.full,
+    padding: 4,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginBottom: Spacing.md,
+  },
+  modeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: Radius.full,
+  },
+  modeBtnActive: {
+    backgroundColor: '#8B5CF6',
+  },
+  modeBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textMuted,
+  },
+  modeBtnTextActive: {
+    color: Colors.warmWhite,
+  },
+  textInputIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  textInputPrompt: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  textInputSubtext: {
+    fontSize: FontSize.sm,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  textInputField: {
+    fontSize: FontSize.md,
+    color: Colors.textPrimary,
+    lineHeight: 24,
+    minHeight: 120,
+    fontWeight: '500',
+  },
+  durationText: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.bold,
+    color: '#EF4444',
+    letterSpacing: 1,
+  },
+  voiceHintContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: Colors.softBlue + '10',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.lg,
+    width: '100%',
+    marginTop: Spacing.md,
+  },
+  voiceHintText: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    flex: 1,
+    lineHeight: 18,
   },
 });

@@ -12,9 +12,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow } from '@/constants/theme';
-import { useHealthData } from '@/hooks/useHealthData';
+import { useWellness } from '@/hooks/useWellness';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { Recommendation } from '@/services/mockData';
 import { useAlert } from '@/template';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -42,7 +41,9 @@ const CATEGORY_COLORS: Record<string, string> = {
 export default function RecommendationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { recommendations } = useWellness();
   const { showAlert } = useAlert();
+  const topRec = recommendations.length > 0 ? recommendations[0] : null;
 
   const handleGetHelp = () => {
     showAlert(
@@ -95,8 +96,12 @@ export default function RecommendationsScreen() {
               <MaterialIcons name="show-chart" size={24} color={Colors.warmWhite} />
             </View>
             <View style={styles.insightTexts}>
-              <Text style={styles.insightQuote}>"Based on your high stress at 3 PM daily, we recommend a short walk then."</Text>
-              <Text style={styles.insightSub}>Matches your typical HRV dip window.</Text>
+              <Text style={styles.insightQuote}>
+                {topRec ? `"${topRec.triggerReason}"` : '"Your vitals look balanced. Keep it up!"'}
+              </Text>
+              <Text style={styles.insightSub}>
+                {topRec ? topRec.title : 'No active recommendations'}
+              </Text>
             </View>
           </View>
           <View style={styles.insightActions}>

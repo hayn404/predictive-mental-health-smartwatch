@@ -11,7 +11,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow } from '@/constants/theme';
-import { useHealthData } from '@/hooks/useHealthData';
+import { useWellness } from '@/hooks/useWellness';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useAlert } from '@/template';
 import { useRouter } from 'expo-router';
@@ -19,7 +19,7 @@ import { useRouter } from 'expo-router';
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { watchStatus } = useHealthData();
+  const { watchConnected, lastSyncTime, deleteAllData, exportData, requestHealthConnectPermissions, healthConnectAvailable, llmConfigured, llmProvider, whisperConfigured } = useWellness();
   const { showAlert } = useAlert();
 
   const [onDevice, setOnDevice] = useState(true);
@@ -39,6 +39,7 @@ export default function SettingsScreen() {
           text: 'Purge Everything',
           style: 'destructive',
           onPress: () => {
+            deleteAllData();
             showAlert('Data Purged', 'All local data has been securely deleted.');
           },
         },
@@ -136,7 +137,7 @@ export default function SettingsScreen() {
             icon="favorite"
             iconColor={Colors.sageGreen}
             label="Heart Rate / HRV"
-            sublabel="Apple Watch S9"
+            sublabel={watchConnected ? 'Connected' : 'Not connected'}
             value={onDevice}
             onValueChange={setOnDevice}
           />
@@ -149,6 +150,19 @@ export default function SettingsScreen() {
             value={sleepTracking}
             onValueChange={setSleepTracking}
           />
+          {healthConnectAvailable && !watchConnected ? (
+            <>
+              <View style={styles.rowDivider} />
+              <SettingRow
+                icon="sync"
+                iconColor={Colors.violet}
+                label="Connect Health Connect"
+                sublabel="Grant sensor permissions"
+                showArrow
+                onPress={() => requestHealthConnectPermissions()}
+              />
+            </>
+          ) : null}
         </GlassCard>
 
         {/* Data Governance */}
@@ -173,6 +187,49 @@ export default function SettingsScreen() {
           />
         </GlassCard>
 
+        {/* AI Services */}
+        <Text style={styles.sectionLabel}>AI Services</Text>
+        <GlassCard variant="default" style={styles.settingsGroup}>
+          {/* Status Row — LLM */}
+          <View style={styles.settingRow}>
+            <View style={[styles.settingIcon, { backgroundColor: Colors.violet + '18' }]}>
+              <MaterialIcons name="psychology" size={18} color={Colors.violet} />
+            </View>
+            <View style={styles.settingText}>
+              <Text style={styles.settingLabel}>Emotional Analysis (LLM)</Text>
+              <Text style={styles.settingSubLabel}>
+                {llmConfigured ? `Connected (${llmProvider})` : 'Not configured'}
+              </Text>
+            </View>
+            <View style={[styles.llmStatusDot, { backgroundColor: llmConfigured ? Colors.sageGreen : Colors.warmGray300 }]} />
+          </View>
+          <View style={styles.rowDivider} />
+
+          {/* Status Row — Whisper */}
+          <View style={styles.settingRow}>
+            <View style={[styles.settingIcon, { backgroundColor: Colors.softBlue + '18' }]}>
+              <MaterialIcons name="hearing" size={18} color={Colors.softBlue} />
+            </View>
+            <View style={styles.settingText}>
+              <Text style={styles.settingLabel}>Voice Transcription (Whisper)</Text>
+              <Text style={styles.settingSubLabel}>
+                {whisperConfigured ? 'Connected' : 'Not configured'}
+              </Text>
+            </View>
+            <View style={[styles.llmStatusDot, { backgroundColor: whisperConfigured ? Colors.sageGreen : Colors.warmGray300 }]} />
+          </View>
+          <View style={styles.rowDivider} />
+
+          {/* Config hint */}
+          <View style={styles.apiKeySection}>
+            <Text style={styles.apiKeyHint}>
+              {llmConfigured
+                ? `Provider: ${llmProvider} | Voice: ${whisperConfigured ? 'Whisper STT' : 'Text only'}\nAnalysis includes biometric cross-referencing with stress, sleep, and HRV data.`
+                : 'AI services are configured in services/ai/aiConfig.ts.\nAdd your API key there to enable real voice transcription and deep emotional analysis.'}
+            </Text>
+          </View>
+        </GlassCard>
+
         {/* Clinical Tools */}
         <Text style={styles.sectionLabel}>Clinical Tools</Text>
         <GlassCard variant="default" style={styles.settingsGroup}>
@@ -182,7 +239,11 @@ export default function SettingsScreen() {
             label="Export Health Data"
             sublabel="JSON format"
             showArrow
-            onPress={() => showAlert('Export Data', 'Your data export will be prepared...')}
+            onPress={async () => {
+              showAlert('Export Data', 'Preparing your data export...');
+              const path = await exportData();
+              if (!path) showAlert('Export Failed', 'Could not export data. Make sure data is available.');
+            }}
           />
           <View style={styles.rowDivider} />
           <SettingRow
@@ -409,5 +470,19 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.textMuted,
     fontWeight: FontWeight.medium,
+  },
+  llmStatusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  apiKeySection: {
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  apiKeyHint: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    lineHeight: 16,
   },
 });

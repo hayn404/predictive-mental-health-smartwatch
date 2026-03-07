@@ -11,14 +11,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow } from '@/constants/theme';
-import { useHealthData } from '@/hooks/useHealthData';
+import { useWellness } from '@/hooks/useWellness';
 import { StressGauge } from '@/components/ui/StressGauge';
 import { GlassCard } from '@/components/ui/GlassCard';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { health } = useHealthData();
+  const { stress, anxiety, lastSleep, heartRate, recommendations } = useWellness();
 
   return (
     <View style={[styles.container, { backgroundColor: '#F3F4F6' }]}>
@@ -51,15 +51,23 @@ export default function HomeScreen() {
 
         {/* Greeting */}
         <View style={styles.greetingSection}>
-          <Text style={styles.greetingHeading}>Good Morning.</Text>
-          <Text style={styles.greetingSub}>You're doing well. Your heart rate is stable.</Text>
+          <Text style={styles.greetingHeading}>
+            {new Date().getHours() < 12 ? 'Good Morning.' : new Date().getHours() < 17 ? 'Good Afternoon.' : 'Good Evening.'}
+          </Text>
+          <Text style={styles.greetingSub}>
+            {stress.stressLevel === 'low'
+              ? `You're doing well. Heart rate is ${heartRate} BPM.`
+              : stress.stressLevel === 'moderate'
+              ? `Moderate stress detected. Take a moment to breathe.`
+              : `Elevated stress detected. Consider a break.`}
+          </Text>
         </View>
 
         {/* Main Stress Gauge */}
         <View style={styles.gaugeCard}>
           <Text style={styles.sectionTitleCenter}>Current Stress Level</Text>
           <View style={styles.gaugeCenter}>
-            <StressGauge value={24} size={180} />
+            <StressGauge value={Math.round(stress.stressScore)} size={180} />
           </View>
           <View style={styles.onDevicePill}>
             <MaterialIcons name="verified-user" size={12} color="#35e27e" />
@@ -79,8 +87,8 @@ export default function HomeScreen() {
             <View style={styles.metricContent}>
               <Text style={styles.metricLabel}>Sleep Quality</Text>
               <View style={styles.metricRow}>
-                <Text style={styles.metricValue}>82%</Text>
-                <Text style={styles.metricSubInfo}>7h 12m</Text>
+                <Text style={styles.metricValue}>{lastSleep ? `${Math.round(lastSleep.qualityScore)}%` : '—'}</Text>
+                <Text style={styles.metricSubInfo}>{lastSleep ? `${Math.floor(lastSleep.totalSleepMin / 60)}h ${lastSleep.totalSleepMin % 60}m` : 'No data'}</Text>
               </View>
             </View>
           </GlassCard>
@@ -95,8 +103,8 @@ export default function HomeScreen() {
             <View style={styles.metricContent}>
               <Text style={styles.metricLabel}>Anxiety Index</Text>
               <View style={styles.metricRow}>
-                <Text style={styles.metricValue}>Stable</Text>
-                <Text style={styles.metricSubInfo}>Trend ↓</Text>
+                <Text style={styles.metricValue}>{anxiety.level.charAt(0).toUpperCase() + anxiety.level.slice(1)}</Text>
+                <Text style={styles.metricSubInfo}>{anxiety.sustained ? 'Sustained ↑' : 'Trend ↓'}</Text>
               </View>
             </View>
           </GlassCard>
@@ -109,7 +117,9 @@ export default function HomeScreen() {
           </View>
           <View style={styles.tipContent}>
             <Text style={styles.tipText}>
-              "Your HRV is slightly low today. Try a 2-minute breathing exercise."
+              {recommendations.length > 0
+                ? `"${recommendations[0].triggerReason}"`
+                : '"Your vitals look good. Keep it up!"'}
             </Text>
             <TouchableOpacity onPress={() => router.push('/(tabs)/recommendations')} style={styles.tipActionBtn}>
               <Text style={styles.tipAction}>START SESSION</Text>
