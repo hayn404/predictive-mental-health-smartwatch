@@ -124,7 +124,7 @@ export default function CheckinScreen() {
                   >
                     <MaterialIcons
                       name={isRecording ? 'stop' : 'mic'}
-                      size={36}
+                      size={42}
                       color={isRecording ? '#EF4444' : Colors.sageGreen}
                     />
                   </TouchableOpacity>
@@ -163,7 +163,7 @@ export default function CheckinScreen() {
                     <View style={styles.liveIndicator}>
                       <View style={[styles.liveIndicatorDot, { backgroundColor: isRecording ? '#EF4444' : isTranscribing ? '#F59E0B' : Colors.warmGray400 }]} />
                       <Text style={[styles.liveIndicatorText, { color: isRecording ? '#EF4444' : isTranscribing ? '#F59E0B' : Colors.textMuted }]}>
-                        {isRecording ? 'RECORDING AUDIO' : isTranscribing ? 'WHISPER TRANSCRIBING' : 'READY'}
+                        {isRecording ? 'CAPTURING TONE & TEXT' : isTranscribing ? 'WHISPER TRANSCRIBING' : 'READY'}
                       </Text>
                     </View>
                     <View style={styles.privacyProtectedBadge}>
@@ -172,7 +172,8 @@ export default function CheckinScreen() {
                   </View>
                   <Text style={styles.transcriptContent}>
                     {isTranscribing ? 'Sending audio to Whisper for transcription...'
-                      : transcript || (isRecording ? 'Speak naturally about how you feel...' : 'Tap the microphone to start recording')}
+                      : transcript || (isRecording ? "How are you feeling today? I'm listening." : 'Tap the microphone to start recording')}
+                    {isRecording && <Text style={{ color: '#C4B5FD', fontSize: FontSize.lg }}> |</Text>}
                   </Text>
                 </View>
 
@@ -183,6 +184,19 @@ export default function CheckinScreen() {
                     <Text style={styles.endButtonText}>Stop & Analyze</Text>
                   </TouchableOpacity>
                 )}
+
+                {/* Secondary Controls */}
+                <View style={styles.secondaryControls}>
+                  <TouchableOpacity style={styles.controlItem}>
+                    <MaterialIcons name="mic-off" size={20} color={Colors.textMuted} />
+                    <Text style={styles.controlLabel}>MUTE</Text>
+                  </TouchableOpacity>
+                  <View style={styles.controlDivider} />
+                  <TouchableOpacity style={styles.controlItem}>
+                    <MaterialIcons name="info-outline" size={20} color={Colors.textMuted} />
+                    <Text style={styles.controlLabel}>TIPS</Text>
+                  </TouchableOpacity>
+                </View>
 
                 {!isRecording && !isTranscribing && (
                   <View style={styles.voiceHintContainer}>
@@ -391,11 +405,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.warmWhite,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.textPrimary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 15,
-    elevation: 4,
   },
   waveform: {
     flexDirection: 'row',
@@ -425,11 +434,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     borderWidth: 1.5,
     borderColor: '#F5F3FF',
-    shadowColor: Colors.textPrimary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 3,
     minHeight: 180,
   },
   transcriptHeader: {
@@ -480,11 +484,6 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: Radius.xl,
     marginTop: Spacing.xl,
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6,
   },
   endButtonText: {
     fontSize: FontSize.md,

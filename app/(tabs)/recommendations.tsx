@@ -122,66 +122,34 @@ export default function RecommendationsScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.toolsGrid}>
-          <View style={styles.toolCard}>
-            <MaterialIcons name="air" size={20} color={Colors.textPrimary} style={styles.toolIcon} />
-            <Text style={styles.toolTitleText}>Breathing</Text>
-            <Text style={styles.toolDescText}>Calm your nervous system with rhythmic</Text>
-            <View style={styles.toolFooter}>
-              <View style={styles.toolDurationRow}>
-                <MaterialIcons name="schedule" size={12} color={Colors.textMuted} />
-                <Text style={styles.toolDurationText}>3-5m</Text>
-              </View>
-              <View style={styles.toolGoBtn}>
-                <MaterialIcons name="chevron-right" size={16} color={Colors.textPrimary} />
-              </View>
+        <View style={styles.toolsIconGrid}>
+          <TouchableOpacity style={styles.toolIconButton} onPress={() => router.push('/activity/breathing')} activeOpacity={0.8}>
+            <View style={[styles.toolIconBg, { backgroundColor: '#F0F9FF', borderColor: '#E0F2FE' }]}>
+              <MaterialIcons name="air" size={28} color={Colors.softBlue} />
             </View>
-          </View>
+            <Text style={styles.toolIconLabel}>Breathing</Text>
+          </TouchableOpacity>
 
-          <View style={styles.toolCard}>
-            <MaterialIcons name="edit" size={20} color={Colors.textPrimary} style={styles.toolIcon} />
-            <Text style={styles.toolTitleText}>Journaling</Text>
-            <Text style={styles.toolDescText}>Externalize your thoughts and identify</Text>
-            <View style={styles.toolFooter}>
-              <View style={styles.toolDurationRow}>
-                <MaterialIcons name="schedule" size={12} color={Colors.textMuted} />
-                <Text style={styles.toolDurationText}>10m</Text>
-              </View>
-              <View style={styles.toolGoBtn}>
-                <MaterialIcons name="chevron-right" size={16} color={Colors.textPrimary} />
-              </View>
+          <TouchableOpacity style={styles.toolIconButton} onPress={() => router.push('/activity/journaling')} activeOpacity={0.8}>
+            <View style={[styles.toolIconBg, { backgroundColor: '#F5F3FF', borderColor: '#EDE9FE' }]}>
+              <MaterialIcons name="edit" size={28} color={Colors.violet} />
             </View>
-          </View>
+            <Text style={styles.toolIconLabel}>Journaling</Text>
+          </TouchableOpacity>
 
-          <View style={styles.toolCard}>
-            <MaterialIcons name="show-chart" size={20} color={Colors.sageGreen} style={styles.toolIcon} />
-            <Text style={styles.toolTitleText}>Physical</Text>
-            <Text style={styles.toolDescText}>Burn off cortisol with light cardiovascular</Text>
-            <View style={styles.toolFooter}>
-              <View style={styles.toolDurationRow}>
-                <MaterialIcons name="schedule" size={12} color={Colors.textMuted} />
-                <Text style={styles.toolDurationText}>15m</Text>
-              </View>
-              <View style={styles.toolGoBtn}>
-                <MaterialIcons name="chevron-right" size={16} color={Colors.textPrimary} />
-              </View>
+          <TouchableOpacity style={styles.toolIconButton} onPress={() => router.push('/activity/physical')} activeOpacity={0.8}>
+            <View style={[styles.toolIconBg, { backgroundColor: '#F0FDF4', borderColor: '#DCFCE7' }]}>
+              <MaterialIcons name="show-chart" size={28} color={Colors.sageGreen} />
             </View>
-          </View>
+            <Text style={styles.toolIconLabel}>Physical</Text>
+          </TouchableOpacity>
 
-          <View style={styles.toolCard}>
-            <MaterialIcons name="favorite-border" size={20} color={'#A78BFA'} style={styles.toolIcon} />
-            <Text style={styles.toolTitleText}>Meditation</Text>
-            <Text style={styles.toolDescText}>Practice presence with guided mindfulness</Text>
-            <View style={styles.toolFooter}>
-              <View style={styles.toolDurationRow}>
-                <MaterialIcons name="schedule" size={12} color={Colors.textMuted} />
-                <Text style={styles.toolDurationText}>5-20m</Text>
-              </View>
-              <View style={styles.toolGoBtn}>
-                <MaterialIcons name="chevron-right" size={16} color={Colors.textPrimary} />
-              </View>
+          <TouchableOpacity style={styles.toolIconButton} onPress={() => router.push('/activity/meditation')} activeOpacity={0.8}>
+            <View style={[styles.toolIconBg, { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7' }]}>
+              <MaterialIcons name="favorite-border" size={28} color={Colors.warning} />
             </View>
-          </View>
+            <Text style={styles.toolIconLabel}>Meditation</Text>
+          </TouchableOpacity>
         </View>
 
         {/* MORNING RITUALS */}
@@ -240,7 +208,7 @@ export default function RecommendationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.cream,
   },
   content: {
     paddingHorizontal: Spacing.xl,
@@ -383,65 +351,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  toolsGrid: {
+  toolsIconGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    marginTop: Spacing.sm,
   },
-  toolCard: {
-    width: '47.5%',
-    backgroundColor: Colors.warmWhite,
+  toolIconButton: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  toolIconBg: {
+    width: 64,
+    height: 64,
     borderRadius: Radius.xl,
-    padding: Spacing.md,
-    paddingVertical: Spacing.lg,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: Colors.textPrimary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  toolIcon: {
-    marginBottom: Spacing.md,
-  },
-  toolTitleText: {
-    fontSize: FontSize.md,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    marginBottom: 4,
-  },
-  toolDescText: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    lineHeight: 16,
-    marginBottom: Spacing.lg,
-    height: 32,
-  },
-  toolFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 'auto',
-  },
-  toolDurationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  toolDurationText: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: Colors.textMuted,
-  },
-  toolGoBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    backgroundColor: Colors.warmWhite,
+  },
+  toolIconLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
   ritualsScroll: {
     gap: Spacing.md,

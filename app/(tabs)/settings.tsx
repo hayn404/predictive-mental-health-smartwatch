@@ -15,6 +15,7 @@ import { useWellness } from '@/hooks/useWellness';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useAlert } from '@/template';
 import { useRouter } from 'expo-router';
+import { scheduleMockHRVDropNotification } from '@/utils/notifications';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -130,14 +131,44 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Device Status */}
-        <Text style={styles.sectionLabel}>Device Status</Text>
+        {/* Connected Device */}
+        <Text style={styles.sectionLabel}>Connected Device</Text>
+        <GlassCard variant="default" style={styles.deviceCard}>
+          <View style={styles.deviceHeader}>
+            <View style={styles.deviceInfoContainer}>
+              <View style={[styles.deviceIconBg, { backgroundColor: '#F0FDF4', borderColor: '#DCFCE7' }]}>
+                <MaterialIcons name="watch" size={24} color={Colors.sageGreen} />
+              </View>
+              <View>
+                <Text style={styles.deviceName}>Apple Watch Series 9</Text>
+                <View style={styles.deviceStatusRow}>
+                  <View style={styles.statusDot} />
+                  <Text style={styles.deviceStatusText}>Connected</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.batteryContainer}>
+              <MaterialIcons name="battery-charging-full" size={20} color={Colors.sageGreen} />
+              <Text style={styles.batteryText}>82%</Text>
+            </View>
+          </View>
+          <View style={styles.rowDivider} />
+          <View style={styles.syncRow}>
+            <Text style={styles.syncText}>Last synced: Just now</Text>
+            <TouchableOpacity style={styles.syncBtn}>
+              <MaterialIcons name="sync" size={16} color={Colors.violet} />
+              <Text style={styles.syncBtnText}>Sync Now</Text>
+            </TouchableOpacity>
+          </View>
+        </GlassCard>
+
+        <Text style={styles.sectionLabel}>Features</Text>
         <GlassCard variant="default" style={styles.settingsGroup}>
           <SettingRow
             icon="favorite"
             iconColor={Colors.sageGreen}
-            label="Heart Rate / HRV"
-            sublabel={watchConnected ? 'Connected' : 'Not connected'}
+            label="Background HR Monitoring"
+            sublabel={watchConnected ? 'Connected — HRV continuous' : 'Not connected'}
             value={onDevice}
             onValueChange={setOnDevice}
           />
@@ -146,7 +177,7 @@ export default function SettingsScreen() {
             icon="bedtime"
             iconColor={Colors.softBlue}
             label="Sleep Analysis"
-            sublabel="Auto-detect"
+            sublabel="Auto-detect sleep stages"
             value={sleepTracking}
             onValueChange={setSleepTracking}
           />
@@ -254,6 +285,26 @@ export default function SettingsScreen() {
             showArrow
             destructive
             onPress={handlePurgeData}
+          />
+        </GlassCard>
+
+        {/* Developer / Debug */}
+        <Text style={styles.sectionLabel}>Developer Tools</Text>
+        <GlassCard variant="default" style={styles.settingsGroup}>
+          <SettingRow
+            icon="notifications-active"
+            iconColor={Colors.violet}
+            label="Simulate HRV Drop Alert"
+            sublabel="Triggers in 5 seconds"
+            showArrow
+            onPress={async () => {
+              const success = await scheduleMockHRVDropNotification();
+              if (success) {
+                showAlert('Notification Scheduled', 'Background the app now to see the push notification arrive in 5 seconds.');
+              } else {
+                showAlert('Permission Denied', 'Please enable notifications in system settings.');
+              }
+            }}
           />
         </GlassCard>
       </ScrollView>
@@ -484,5 +535,86 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     lineHeight: 16,
+  },
+  deviceCard: {
+    padding: 0,
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
+  },
+  deviceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+  },
+  deviceInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  deviceIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  deviceName: {
+    fontSize: FontSize.md,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  deviceStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.sageGreen,
+  },
+  deviceStatusText: {
+    fontSize: FontSize.xs,
+    color: Colors.sageGreenDark,
+    fontWeight: '600',
+  },
+  batteryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+  },
+  batteryText: {
+    fontSize: FontSize.xs,
+    color: Colors.sageGreenDark,
+    fontWeight: 'bold',
+  },
+  syncRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    backgroundColor: '#F9FAFB',
+  },
+  syncText: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+  },
+  syncBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  syncBtnText: {
+    fontSize: FontSize.xs,
+    color: Colors.violet,
+    fontWeight: 'bold',
   },
 });

@@ -21,7 +21,7 @@ export default function HomeScreen() {
   const { stress, anxiety, lastSleep, heartRate, recommendations } = useWellness();
 
   return (
-    <View style={[styles.container, { backgroundColor: '#F3F4F6' }]}>
+    <View style={[styles.container, { backgroundColor: Colors.cream }]}>
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -67,7 +67,7 @@ export default function HomeScreen() {
         <View style={styles.gaugeCard}>
           <Text style={styles.sectionTitleCenter}>Current Stress Level</Text>
           <View style={styles.gaugeCenter}>
-            <StressGauge value={Math.round(stress.stressScore)} size={180} />
+            <StressGauge value={Math.round(stress.stressScore)} size={140} />
           </View>
           <View style={styles.onDevicePill}>
             <MaterialIcons name="verified-user" size={12} color="#35e27e" />
@@ -110,6 +110,55 @@ export default function HomeScreen() {
           </GlassCard>
         </View>
 
+        {/* Sunlight Exposure Card */}
+        <GlassCard variant="default" style={styles.sunlightCard}>
+          <View style={styles.sunlightLeft}>
+            <View style={[styles.sunlightIconBg, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
+              <MaterialIcons name="wb-sunny" size={24} color={Colors.warning} />
+            </View>
+            <View>
+              <Text style={styles.metricLabel}>Sunlight Exposure</Text>
+              <Text style={styles.metricSubInfo}>Daily Goal: 30 mins</Text>
+            </View>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={[styles.metricValue, { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary }]}>15m</Text>
+            <Text style={styles.liveTextSmall}>Today</Text>
+          </View>
+        </GlassCard>
+
+        {/* Clinical Assessments */}
+        <View style={styles.assessmentsSection}>
+          <Text style={styles.sectionTitleLeft}>Clinical Assessments</Text>
+          <View style={styles.assessmentCards}>
+            <TouchableOpacity onPress={() => router.push('/screening/phq9')} activeOpacity={0.8}>
+              <GlassCard variant="default" style={styles.assessmentCard}>
+                <View style={[styles.assessmentIconBg, { backgroundColor: '#F0F9FF', borderColor: '#E0F2FE' }]}>
+                  <MaterialIcons name="assignment" size={24} color={Colors.softBlue} />
+                </View>
+                <View style={styles.assessmentContent}>
+                  <Text style={styles.assessmentLabel}>Depression (PHQ-9)</Text>
+                  <Text style={styles.assessmentDesc}>Check your mood and energy levels.</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={24} color={Colors.warmGray400} />
+              </GlassCard>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => router.push('/screening/gad7')} activeOpacity={0.8}>
+              <GlassCard variant="default" style={styles.assessmentCard}>
+                <View style={[styles.assessmentIconBg, { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7' }]}>
+                  <MaterialIcons name="assignment-late" size={24} color={Colors.warning} />
+                </View>
+                <View style={styles.assessmentContent}>
+                  <Text style={styles.assessmentLabel}>Anxiety (GAD-7)</Text>
+                  <Text style={styles.assessmentDesc}>Monitor your stress and worry.</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={24} color={Colors.warmGray400} />
+              </GlassCard>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Wellness Summary Tip */}
         <View style={styles.tipBanner}>
           <View style={styles.tipIconWrapper}>
@@ -128,15 +177,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
-
-      {/* Voice Check-in FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { bottom: insets.bottom + 16 }]}
-        onPress={() => router.push('/(tabs)/checkin')}
-        activeOpacity={0.8}
-      >
-        <MaterialIcons name="mic" size={24} color={Colors.warmWhite} />
-      </TouchableOpacity>
     </View>
   );
 }
@@ -150,7 +190,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg,
-    gap: Spacing.lg,
+    gap: Spacing.md, // compressed from Spacing.lg
   },
   header: {
     flexDirection: 'row',
@@ -216,18 +256,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   gaugeCard: {
-    padding: Spacing.xl,
-    paddingTop: Spacing.xxl,
-    gap: Spacing.md,
+    padding: Spacing.lg, // compressed from xl
+    paddingTop: Spacing.lg, // compressed from xxl
+    gap: Spacing.sm, // compressed from md
     alignItems: 'center',
-    marginVertical: Spacing.md,
-    borderRadius: 40,
+    marginVertical: 4, // compressed from Spacing.md
+    borderRadius: 32,
     backgroundColor: Colors.warmWhite,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 15,
-    elevation: 2,
   },
   sectionTitleCenter: {
     fontSize: FontSize.md,
@@ -235,18 +270,60 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
   },
+  sectionTitleLeft: {
+    fontSize: FontSize.md,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+  },
+  assessmentsSection: {
+    marginTop: Spacing.sm,
+  },
+  assessmentCards: {
+    gap: Spacing.md,
+  },
+  assessmentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    gap: Spacing.md,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.warmWhite,
+    borderWidth: 0,
+  },
+  assessmentIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  assessmentContent: {
+    flex: 1,
+    gap: 4,
+  },
+  assessmentLabel: {
+    fontSize: FontSize.md,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+  },
+  assessmentDesc: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+  },
   gaugeCenter: {
-    marginVertical: Spacing.md,
+    marginVertical: Spacing.xs, // compressed from Spacing.md
   },
   onDevicePill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: Radius.full,
-    gap: 8,
-    marginTop: Spacing.xl,
+    gap: 6,
+    marginTop: Spacing.sm, // compressed from Spacing.xl
   },
   onDevicePillText: {
     fontSize: 11,
@@ -257,21 +334,16 @@ const styles = StyleSheet.create({
   metricsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: Spacing.md,
-    marginBottom: Spacing.sm,
+    gap: Spacing.sm, // compressed from md
+    marginBottom: 4, // compressed from sm
   },
   customMetricCard: {
     flex: 1,
-    padding: Spacing.lg,
+    padding: Spacing.md, // compressed from lg
     borderRadius: Radius.xl,
     backgroundColor: Colors.warmWhite,
     borderWidth: 0,
-    shadowColor: Colors.textPrimary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    elevation: 3,
-    gap: Spacing.lg,
+    gap: Spacing.md, // compressed from lg
   },
   metricHeader: {
     flexDirection: 'row',
@@ -353,17 +425,27 @@ const styles = StyleSheet.create({
     color: Colors.sageGreen,
     letterSpacing: 0.5,
   },
-  fab: {
-    position: 'absolute',
-    right: Spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.violet,
+  sunlightCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.lg,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.warmWhite,
+    borderWidth: 0,
+    marginBottom: Spacing.sm,
+  },
+  sunlightLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  sunlightIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: Colors.warmWhite,
-    ...Shadow.glow,
+    borderWidth: 1,
   },
 });
