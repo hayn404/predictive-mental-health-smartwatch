@@ -38,3 +38,11 @@ yarn-error.*
 
 app-example
 coverage/
+ml/.venv/
+ml/.pytest_cache/
+ml/src/__pycache__/
+ml/tests/__pycache__/
+ml/data/
+ml/models/*.joblib
+__pycache__/
+*.pyc
