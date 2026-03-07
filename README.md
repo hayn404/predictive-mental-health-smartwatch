@@ -61,6 +61,19 @@ npx expo start --clear
 4. Push to the branch (`git push origin feature/your-feature`)
 5. Open a Pull Request
 
+## App Pages & Structure
+
+Based on the core user stories and design requirements, the application has the following pages:
+
+1. **Welcome & Vision** (`/app/onboarding/welcome.tsx`): 3-step value proposition carousel introducing Seren as a proactive mental wellness companion.
+2. **Device Sync** (`/app/onboarding/sync.tsx`): Smartwatch Bluetooth connection, showing live battery status and connection strength.
+3. **Privacy & Permissions** (`/app/onboarding/privacy.tsx`): Health data permissions (HR/Sleep) and the interactive "Keep all data on-device" privacy toggle.
+4. **Main Dashboard ("Seren" Home)** (`/app/(tabs)/index.tsx`): Real-time stress levels, sleep quality, anxiety index, and proactive insights/notifications.
+5. **Voice Check-in** (`/app/(tabs)/checkin.tsx`): Empathetic conversational UI to record mood notes to capture emotional nuances.
+6. **Insights & Deep Dive** (`/app/(tabs)/insights.tsx`): Historical trend analysis for stress, sleep, and HRV.
+7. **Recommendations & Resources** (`/app/(tabs)/recommendations.tsx`): Proactive interventions, breathing exercises, and AI suggestions based on daily rhythms.
+8. **Privacy, Settings & Clinical Tools** (`/app/(tabs)/settings.tsx`): Data control, purge options, watch status, and links to clinical screening tools like PHQ-9.
+
 ## License
 
 This project is private. For collaboration inquiries, please contact the author.

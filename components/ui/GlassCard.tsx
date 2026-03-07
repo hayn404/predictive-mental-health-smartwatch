@@ -47,18 +47,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(82, 196, 122, 0.10)',
     borderWidth: 1,
     borderColor: 'rgba(82, 196, 122, 0.25)',
-    ...Shadow.soft,
   },
   violet: {
     backgroundColor: 'rgba(123, 97, 196, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(123, 97, 196, 0.20)',
-    ...Shadow.soft,
   },
   blue: {
     backgroundColor: 'rgba(107, 159, 204, 0.10)',
     borderWidth: 1,
     borderColor: 'rgba(107, 159, 204, 0.25)',
-    ...Shadow.soft,
   },
 });

@@ -203,7 +203,7 @@ export default function InsightsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.cream,
   },
   content: {
     paddingHorizontal: Spacing.xl,
@@ -270,11 +270,6 @@ const styles = StyleSheet.create({
   },
   filterChipActive: {
     backgroundColor: Colors.warmWhite,
-    shadowColor: Colors.textPrimary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   filterChipText: {
     fontSize: FontSize.sm,
@@ -289,11 +284,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.warmWhite,
     borderRadius: Radius.xl,
     padding: Spacing.lg,
-    shadowColor: Colors.textPrimary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.05,
-    shadowRadius: 20,
-    elevation: 4,
   },
   chartHeaderRow: {
     flexDirection: 'row',

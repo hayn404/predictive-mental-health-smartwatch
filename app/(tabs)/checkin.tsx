@@ -95,13 +95,23 @@ export default function CheckinScreen() {
             {/* Mic Box */}
             <View style={styles.micGlowContainer}>
               <TouchableOpacity
-                style={styles.micButton}
+                style={[
+                  styles.micButton,
+                  isRecording && { backgroundColor: Colors.errorMuted }
+                ]}
                 onPress={isRecording ? stopAndAnalyze : startRecording}
                 activeOpacity={0.85}
               >
-                <MaterialIcons name="mic" size={36} color={Colors.sageGreen} />
+                <MaterialIcons
+                  name={isRecording ? "stop" : "mic"}
+                  size={42}
+                  color={isRecording ? Colors.error : Colors.sageGreen}
+                />
               </TouchableOpacity>
             </View>
+            <Text style={{ textAlign: 'center', marginTop: 16, color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600', letterSpacing: 0.5 }}>
+              {isRecording ? "Tap square to stop & analyze" : "Tap microphone to begin"}
+            </Text>
 
             {/* Waveform */}
             <View style={styles.waveform}>
@@ -126,23 +136,17 @@ export default function CheckinScreen() {
               <View style={styles.transcriptHeader}>
                 <View style={styles.liveIndicator}>
                   <View style={[styles.liveIndicatorDot, { backgroundColor: isRecording ? '#A78BFA' : Colors.warmGray400 }]} />
-                  <Text style={[styles.liveIndicatorText, { color: isRecording ? '#A78BFA' : Colors.textMuted }]}>LIVE TRANSCRIPTION</Text>
+                  <Text style={[styles.liveIndicatorText, { color: isRecording ? '#A78BFA' : Colors.textMuted }]}>CAPTURING TONE & TEXT</Text>
                 </View>
                 <View style={styles.privacyProtectedBadge}>
                   <Text style={styles.privacyProtectedText}>Privacy Protected</Text>
                 </View>
               </View>
               <Text style={styles.transcriptContent}>
-                {transcript || (!isRecording ? 'Tap the microphone to start...' : '')}
+                {transcript || (!isRecording ? "How are you feeling today? I'm listening." : '')}
                 {isRecording && <Text style={{ color: '#C4B5FD', fontSize: FontSize.lg }}> |</Text>}
               </Text>
             </View>
-
-            {/* Main Action Button */}
-            <TouchableOpacity style={styles.endButton} onPress={stopAndAnalyze}>
-              <MaterialIcons name="check-circle-outline" size={20} color={Colors.warmWhite} />
-              <Text style={styles.endButtonText}>End & Analyze</Text>
-            </TouchableOpacity>
 
             {/* Secondary Controls */}
             <View style={styles.secondaryControls}>
@@ -286,11 +290,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.warmWhite,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.textPrimary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 15,
-    elevation: 4,
   },
   waveform: {
     flexDirection: 'row',
@@ -320,11 +319,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     borderWidth: 1.5,
     borderColor: '#F5F3FF',
-    shadowColor: Colors.textPrimary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 3,
     minHeight: 180,
   },
   transcriptHeader: {
@@ -375,11 +369,6 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: Radius.xl,
     marginTop: Spacing.xl,
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6,
   },
   endButtonText: {
     fontSize: FontSize.md,
