@@ -1,0 +1,87 @@
+# ============================================================
+# Seren — Docker Compose Stack
+# ============================================================
+# Services:
+#   mlflow   — Experiment tracking UI (port 5000)
+#   ml-train — Trains the stress model with MLflow logging
+#   ml-test  — Runs ML pipeline unit tests
+#   app-check — Lints and type-checks the React Native app
+# ============================================================
+
+services:
+  # ---- MLflow Tracking Server ----
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.10.0
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- ML Pipeline: Unit Tests ----
+  ml-test:
+    build:
+      context: ./ml
+      target: test
+    environment:
+      - PYTHONPATH=/app/src
+
+  # ---- ML Pipeline: Training ----
+  ml-train:
+    build:
+      context: ./ml
+      target: train
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    volumes:
+      - ./ml/data:/app/data
+      - ./ml/models:/app/models
+      - ./assets/ml:/app/assets/ml
+    environment:
+      - PYTHONPATH=/app/src
+      - USE_MLFLOW=true
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - LOG_LEVEL=INFO
+      # Override these to use real data:
+      # - WESAD_DIR=/app/data/wesad
+
+  # ---- ML Pipeline: Training WITHOUT MLflow (standalone) ----
+  ml-train-local:
+    build:
+      context: ./ml
+      target: train
+    volumes:
+      - ./ml/data:/app/data
+      - ./ml/models:/app/models
+      - ./assets/ml:/app/assets/ml
+    environment:
+      - PYTHONPATH=/app/src
+      - USE_MLFLOW=false
+      - LOG_LEVEL=INFO
+    profiles:
+      - local
+
+  # ---- App: Lint & Type Check ----
+  app-check:
+    build:
+      context: .
+      target: check
+    profiles:
+      - ci
+
+volumes:
+  mlflow-data:

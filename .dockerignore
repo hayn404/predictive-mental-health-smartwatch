@@ -1,0 +1,10 @@
+node_modules
+.expo
+ios
+android
+dist
+ml/data/wesad
+ml/models/*.joblib
+ml/__pycache__
+.git
+*.log
