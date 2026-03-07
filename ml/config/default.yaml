@@ -1,0 +1,64 @@
+# Seren ML Pipeline Configuration
+# =================================
+
+project:
+  name: seren-stress-model
+  version: "1.0.0"
+
+data:
+  # Path to raw WESAD data (or synthetic if not available)
+  # Docker paths (default), override with env vars for local dev
+  wesad_dir: ./data/wesad
+  swell_csv: ./data/swell/swell_hrv.csv
+  features_csv: ./data/wesad_features.csv
+  windows_pkl: ./data/wesad_windows.pkl
+
+  # Window configuration
+  window_sec: 300          # 5-minute windows
+  overlap: 0.0             # No overlap
+  label_purity: 0.8        # Minimum label consistency per window
+
+  # Synthetic data (used when real data isn't available)
+  synthetic:
+    n_subjects: 15
+    windows_per_subject: 40
+    stress_ratio: 0.35
+    seed: 42
+
+model:
+  # XGBoost hyperparameters
+  n_estimators: 200
+  max_depth: 6
+  learning_rate: 0.1
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_weight: 3
+  eval_metric: logloss
+  seed: 42
+
+training:
+  # Cross-validation strategy
+  cv_strategy: loso        # Leave-One-Subject-Out
+  test_size: 0.2           # Fallback if LOSO not possible
+
+export:
+  # Output paths
+  model_dir: ./models
+  model_json: stress_model.json
+  metadata_json: model_metadata.json
+  app_assets_dir: ../assets/ml
+
+  # Stress level thresholds (displayed in app)
+  stress_levels:
+    low: { min: 0, max: 25, label: "Low", color: "#35e27e" }
+    moderate: { min: 25, max: 50, label: "Moderate", color: "#9B8EC4" }
+    elevated: { min: 50, max: 75, label: "Elevated", color: "#E8A87C" }
+    high: { min: 75, max: 100, label: "High", color: "#C4897B" }
+
+mlflow:
+  tracking_uri: http://mlflow:5000
+  experiment_name: seren-stress-detection
+
+logging:
+  level: INFO
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
