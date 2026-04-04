@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Seren brand colors -->
+    <color name="seren_sage_green">#FF35E27E</color>
+    <color name="seren_violet">#FFA288FC</color>
+    <color name="seren_soft_blue">#FF739EE8</color>
+    <color name="seren_warning">#FFFFB84D</color>
+    <color name="seren_cream">#FFF7F8FA</color>
+    <color name="seren_background">#FF1A1A2E</color>
+    <color name="seren_surface">#FF242442</color>
+    <color name="seren_text_primary">#FFFFFFFF</color>
+    <color name="seren_text_secondary">#FFB0B0C8</color>
+    <color name="seren_error">#FFEF4444</color>
+</resources>
