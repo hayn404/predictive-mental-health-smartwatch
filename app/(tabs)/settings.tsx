@@ -16,12 +16,32 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { useAlert } from '@/template';
 import { useRouter } from 'expo-router';
 import { scheduleMockHRVDropNotification } from '@/utils/notifications';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { watchConnected, lastSyncTime, deleteAllData, exportData, requestHealthConnectPermissions, healthConnectAvailable, llmConfigured, llmProvider, whisperConfigured } = useWellness();
   const { showAlert } = useAlert();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    showAlert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/auth/login' as any);
+          },
+        },
+      ]
+    );
+  };
 
   const [onDevice, setOnDevice] = useState(true);
   const [notifications, setNotifications] = useState(true);
@@ -51,7 +71,7 @@ export default function SettingsScreen() {
   const handleDisconnectWatch = () => {
     showAlert(
       'Disconnect Watch',
-      'Disconnect Apple Watch Series 9 from Seren?',
+      'Disconnect smartwatch from Seren? Health Connect sync will stop.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Disconnect', style: 'destructive', onPress: () => { } },
@@ -131,34 +151,73 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Account */}
+        <Text style={styles.sectionLabel}>Account</Text>
+        <GlassCard variant="default" style={styles.settingsGroup}>
+          <View style={styles.settingRow}>
+            <View style={[styles.settingIcon, { backgroundColor: Colors.violet + '18' }]}>
+              <MaterialIcons name="person" size={18} color={Colors.violet} />
+            </View>
+            <View style={styles.settingText}>
+              <Text style={styles.settingLabel}>{user?.username || user?.email || 'User'}</Text>
+              <Text style={styles.settingSubLabel}>{user?.email || ''}</Text>
+            </View>
+          </View>
+          <View style={styles.rowDivider} />
+          <SettingRow
+            icon="logout"
+            iconColor={Colors.error}
+            label="Sign Out"
+            showArrow
+            destructive
+            onPress={handleLogout}
+          />
+        </GlassCard>
+
         {/* Connected Device */}
         <Text style={styles.sectionLabel}>Connected Device</Text>
         <GlassCard variant="default" style={styles.deviceCard}>
           <View style={styles.deviceHeader}>
             <View style={styles.deviceInfoContainer}>
-              <View style={[styles.deviceIconBg, { backgroundColor: '#F0FDF4', borderColor: '#DCFCE7' }]}>
-                <MaterialIcons name="watch" size={24} color={Colors.sageGreen} />
+              <View style={[styles.deviceIconBg, watchConnected
+                ? { backgroundColor: '#F0FDF4', borderColor: '#DCFCE7' }
+                : { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }
+              ]}>
+                <MaterialIcons name="watch" size={24} color={watchConnected ? Colors.sageGreen : Colors.error} />
               </View>
               <View>
-                <Text style={styles.deviceName}>Apple Watch Series 9</Text>
+                <Text style={styles.deviceName}>
+                  {watchConnected ? 'Smartwatch' : 'No Watch Connected'}
+                </Text>
                 <View style={styles.deviceStatusRow}>
-                  <View style={styles.statusDot} />
-                  <Text style={styles.deviceStatusText}>Connected</Text>
+                  <View style={[styles.statusDot, { backgroundColor: watchConnected ? Colors.sageGreen : Colors.warmGray300 }]} />
+                  <Text style={styles.deviceStatusText}>
+                    {watchConnected
+                      ? (healthConnectAvailable ? 'Via Health Connect' : 'Mock Data')
+                      : 'Disconnected'}
+                  </Text>
                 </View>
               </View>
-            </View>
-            <View style={styles.batteryContainer}>
-              <MaterialIcons name="battery-charging-full" size={20} color={Colors.sageGreen} />
-              <Text style={styles.batteryText}>82%</Text>
             </View>
           </View>
           <View style={styles.rowDivider} />
           <View style={styles.syncRow}>
-            <Text style={styles.syncText}>Last synced: Just now</Text>
-            <TouchableOpacity style={styles.syncBtn}>
-              <MaterialIcons name="sync" size={16} color={Colors.violet} />
-              <Text style={styles.syncBtnText}>Sync Now</Text>
-            </TouchableOpacity>
+            <Text style={styles.syncText}>
+              {watchConnected
+                ? `Last synced: ${lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                : 'Connect via Health Connect to start'}
+            </Text>
+            {watchConnected ? (
+              <TouchableOpacity style={styles.syncBtn}>
+                <MaterialIcons name="sync" size={16} color={Colors.violet} />
+                <Text style={styles.syncBtnText}>Sync Now</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.syncBtn} onPress={() => requestHealthConnectPermissions()}>
+                <MaterialIcons name="add-link" size={16} color={Colors.violet} />
+                <Text style={styles.syncBtnText}>Connect</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </GlassCard>
 

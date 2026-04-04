@@ -89,6 +89,7 @@ export interface HealthConnectService {
 export function createHealthConnectService(): HealthConnectService {
   // Dynamic import to avoid crash when package isn't installed
   let HC: typeof import('react-native-health-connect') | null = null;
+  let initialized = false;
 
   const getHC = async () => {
     if (!HC) {
@@ -98,6 +99,12 @@ export function createHealthConnectService(): HealthConnectService {
         throw new Error('react-native-health-connect not installed. Use mock service instead.');
       }
     }
+    // Must call initialize() before any other Health Connect API call
+    if (!initialized) {
+      await HC.initialize();
+      initialized = true;
+      console.log('[Seren] Health Connect SDK initialized');
+    }
     return HC;
   };
 
@@ -106,8 +113,10 @@ export function createHealthConnectService(): HealthConnectService {
       try {
         const hc = await getHC();
         const status = await hc.getSdkStatus();
+        console.log('[Seren] Health Connect SDK status:', status);
         return status === hc.SdkAvailabilityStatus.SDK_AVAILABLE;
-      } catch {
+      } catch (e) {
+        console.warn('[Seren] Health Connect availability check failed:', e);
         return false;
       }
     },
@@ -115,24 +124,25 @@ export function createHealthConnectService(): HealthConnectService {
     async requestPermissions() {
       try {
         const hc = await getHC();
-        await hc.requestPermission([
+        // Only request record types supported by this version of react-native-health-connect
+        const granted = await hc.requestPermission([
           { accessType: 'read', recordType: 'HeartRate' },
           { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
           { accessType: 'read', recordType: 'SleepSession' },
           { accessType: 'read', recordType: 'Steps' },
           { accessType: 'read', recordType: 'OxygenSaturation' },
-          { accessType: 'read', recordType: 'SkinTemperature' },
-          { accessType: 'read', recordType: 'RespiratoryRate' },
         ]);
-        return true;
-      } catch {
+        console.log('[Seren] Health Connect permissions result:', JSON.stringify(granted));
+        // requestPermission returns an array of granted permissions
+        return Array.isArray(granted) && granted.length > 0;
+      } catch (e) {
+        console.error('[Seren] Health Connect permission request failed:', e);
         return false;
       }
     },
 
     async hasPermissions() {
-      // Health Connect doesn't have a direct "check permissions" API;
-      // we attempt a small read and see if it succeeds
+      // Attempt a small read to check if we have permissions
       try {
         const hc = await getHC();
         const now = new Date();
@@ -144,7 +154,8 @@ export function createHealthConnectService(): HealthConnectService {
           },
         });
         return true;
-      } catch {
+      } catch (e) {
+        console.log('[Seren] hasPermissions check failed (likely not granted yet):', e);
         return false;
       }
     },
@@ -228,51 +239,62 @@ export function createHealthConnectService(): HealthConnectService {
     },
 
     async readTemperature(startTime, endTime) {
-      const hc = await getHC();
-      const result = await hc.readRecords('SkinTemperature', {
-        timeRangeFilter: {
-          operator: 'between',
-          startTime: new Date(startTime).toISOString(),
-          endTime: new Date(endTime).toISOString(),
-        },
-      });
-
-      return result.records.map((record: any) => ({
-        timestamp: new Date(record.time).getTime(),
-        temperatureCelsius: record.temperature?.inCelsius || 0,
-      }));
+      // SkinTemperature not supported in all react-native-health-connect versions
+      try {
+        const hc = await getHC();
+        const result = await hc.readRecords('SkinTemperature' as any, {
+          timeRangeFilter: {
+            operator: 'between',
+            startTime: new Date(startTime).toISOString(),
+            endTime: new Date(endTime).toISOString(),
+          },
+        });
+        return result.records.map((record: any) => ({
+          timestamp: new Date(record.time).getTime(),
+          temperatureCelsius: record.temperature?.inCelsius || 0,
+        }));
+      } catch {
+        return [];
+      }
     },
 
     async readSpO2(startTime, endTime) {
-      const hc = await getHC();
-      const result = await hc.readRecords('OxygenSaturation', {
-        timeRangeFilter: {
-          operator: 'between',
-          startTime: new Date(startTime).toISOString(),
-          endTime: new Date(endTime).toISOString(),
-        },
-      });
-
-      return result.records.map((record: any) => ({
-        timestamp: new Date(record.time).getTime(),
-        percentage: record.percentage,
-      }));
+      try {
+        const hc = await getHC();
+        const result = await hc.readRecords('OxygenSaturation', {
+          timeRangeFilter: {
+            operator: 'between',
+            startTime: new Date(startTime).toISOString(),
+            endTime: new Date(endTime).toISOString(),
+          },
+        });
+        return result.records.map((record: any) => ({
+          timestamp: new Date(record.time).getTime(),
+          percentage: record.percentage,
+        }));
+      } catch {
+        return [];
+      }
     },
 
     async readRespiratoryRate(startTime, endTime) {
-      const hc = await getHC();
-      const result = await hc.readRecords('RespiratoryRate', {
-        timeRangeFilter: {
-          operator: 'between',
-          startTime: new Date(startTime).toISOString(),
-          endTime: new Date(endTime).toISOString(),
-        },
-      });
-
-      return result.records.map((record: any) => ({
-        timestamp: new Date(record.time).getTime(),
-        breathsPerMinute: record.rate,
-      }));
+      // RespiratoryRate not supported in all react-native-health-connect versions
+      try {
+        const hc = await getHC();
+        const result = await hc.readRecords('RespiratoryRate' as any, {
+          timeRangeFilter: {
+            operator: 'between',
+            startTime: new Date(startTime).toISOString(),
+            endTime: new Date(endTime).toISOString(),
+          },
+        });
+        return result.records.map((record: any) => ({
+          timestamp: new Date(record.time).getTime(),
+          breathsPerMinute: record.rate,
+        }));
+      } catch {
+        return [];
+      }
     },
   };
 }

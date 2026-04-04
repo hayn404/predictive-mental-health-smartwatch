@@ -12,11 +12,26 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.seren.app",
+      "minSdkVersion": 26,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_HEART_RATE_VARIABILITY",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_OXYGEN_SATURATION",
+        "android.permission.health.READ_SKIN_TEMPERATURE",
+        "android.permission.health.READ_RESPIRATORY_RATE",
+        "android.permission.BODY_SENSORS",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -25,6 +40,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-dev-client",
       [
         "expo-splash-screen",
         {
@@ -34,7 +50,20 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Seren uses your location to track routine diversity and suggest new places."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Seren uses motion sensors to detect activity levels."
+        }
+      ],
+      "./plugins/withHealthConnect"
     ],
     "experiments": {
       "typedRoutes": true
