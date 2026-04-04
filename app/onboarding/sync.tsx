@@ -29,6 +29,9 @@ export default function SyncScreen() {
             ])
         );
         anim.start();
+
+        // Simulate connection — actual Health Connect permissions
+        // are granted later via Settings > Connect Health Connect
         setTimeout(() => {
             anim.stop();
             setScanning(false);
@@ -81,8 +84,8 @@ export default function SyncScreen() {
                     <View style={styles.watchConnectedRow}>
                         <MaterialIcons name="check-circle" size={24} color={Colors.sageGreen} />
                         <View>
-                            <Text style={styles.watchName}>Apple Watch Series 9</Text>
-                            <Text style={styles.watchSub}>Battery 73% · Ready</Text>
+                            <Text style={styles.watchName}>Smartwatch Connected</Text>
+                            <Text style={styles.watchSub}>Health Connect · Ready</Text>
                         </View>
                     </View>
                 ) : (
