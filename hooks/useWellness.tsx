@@ -38,6 +38,8 @@ import {
   Recommendation,
   CheckinAnalysis,
   BiometricFeatureVector,
+  LocationDiversitySummary,
+  SunlightExposureSummary,
 } from '@/services/ai/types';
 
 import {
@@ -67,6 +69,13 @@ import {
   getRecentFeatureWindows,
   deleteAllData as dbDeleteAllData,
   cleanupOldData,
+  upsertLocationDiversity,
+  getTodayLocationDiversity,
+  getLocationDiversityHistory,
+  upsertSunlightDaily,
+  getTodaySunlightDaily,
+  insertSunlightSample,
+  getSunlightDailyHistory,
   SQLiteDatabase,
 } from '@/services/ai/db';
 import {
@@ -81,6 +90,18 @@ import { exportHealthData } from '@/services/ai/dataExport';
 import { configureLLMPreset, isLLMConfigured, getLLMConfig } from '@/services/ai/llmService';
 import { configureWhisper, isWhisperConfigured } from '@/services/ai/whisperService';
 import { initializeAIServices } from '@/services/ai/aiConfig';
+import {
+  getMockLocationDiversity,
+  getMockWeeklyLocationDiversity,
+  startLocationTracking as startLocationWatch,
+  calculateDiversityScore,
+} from '@/services/ai/locationTracking';
+import {
+  getMockSunlightExposure,
+  getMockWeeklySunlight,
+  startSunlightMonitoring,
+  isLightSensorAvailable,
+} from '@/services/ai/sunlightTracking';
 
 // ============================================================
 // Types
@@ -107,10 +128,16 @@ interface WellnessContextValue {
   checkinTrend: CheckinTrend;
   performCheckin: (transcript: string) => Promise<CheckinAnalysis>;
 
+  // Location & Sunlight
+  locationDiversity: LocationDiversitySummary | null;
+  sunlightExposure: SunlightExposureSummary | null;
+
   // Weekly data for charts
   weeklyStress: { date: string; value: number }[];
   weeklyHrv: { date: string; value: number }[];
   weeklySleep: { date: string; value: number }[];
+  weeklyLocationDiversity: { date: string; value: number }[];
+  weeklySunlight: { date: string; value: number }[];
 
   // Insights chart data
   monthlySleepGrid: number[][];
@@ -193,6 +220,12 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const [heartRate, setHeartRate] = useState(68);
   const [hrv, setHrv] = useState(58);
 
+  // Location & Sunlight state
+  const [locationDiversity, setLocationDiversity] = useState<LocationDiversitySummary | null>(null);
+  const [sunlightExposure, setSunlightExposure] = useState<SunlightExposureSummary | null>(null);
+  const [weeklyLocationDiversity, setWeeklyLocationDiversity] = useState<{ date: string; value: number }[]>([]);
+  const [weeklySunlight, setWeeklySunlight] = useState<{ date: string; value: number }[]>([]);
+
   // Check-in state
   const [lastCheckin, setLastCheckin] = useState<CheckinAnalysis | null>(null);
   const [checkinHistory, setCheckinHistory] = useState<CheckinAnalysis[]>([]);
@@ -240,6 +273,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       initNotifications(),
     ]);
     generateInitialChartData();
+    initLocationAndSunlight();
   }
 
   async function loadStressModel() {
@@ -317,6 +351,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   async function initHealthConnect() {
     try {
       if (Platform.OS !== 'android') {
+        console.log('[Seren] Not Android — using mock Health Connect');
         healthService.current = createMockHealthConnectService();
         setWatchConnected(true);
         return;
@@ -327,15 +362,23 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
       if (available) {
         setHealthConnectAvailable(true);
+        console.log('[Seren] Health Connect available, checking permissions...');
+
+        // Only check if we already have permissions — don't request here.
+        // The permission dialog must be triggered by user interaction (Settings or Onboarding).
         const hasPerms = await realService.hasPermissions();
+
         if (hasPerms) {
+          console.log('[Seren] Health Connect permissions granted — using REAL data');
           healthService.current = realService;
           setWatchConnected(true);
         } else {
+          console.log('[Seren] Permissions not yet granted — using mock data. Grant via Settings.');
           healthService.current = createMockHealthConnectService();
-          setWatchConnected(true);
+          setWatchConnected(false);
         }
       } else {
+        console.log('[Seren] Health Connect not available — using mock data');
         healthService.current = createMockHealthConnectService();
         setWatchConnected(true);
       }
@@ -352,6 +395,90 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       await scheduleDailyCheckinReminder(20, 0);
     } catch (e) {
       console.warn('[Seren] Notification init failed:', e);
+    }
+  }
+
+  async function initLocationAndSunlight() {
+    try {
+      // Load persisted data first
+      if (dbReadyRef.current) {
+        const savedLocation = await getTodayLocationDiversity();
+        if (savedLocation) setLocationDiversity(savedLocation);
+
+        const savedSunlight = await getTodaySunlightDaily();
+        if (savedSunlight) setSunlightExposure(savedSunlight);
+
+        const locationHistory = await getLocationDiversityHistory(7);
+        if (locationHistory.length > 0) {
+          const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+          const mapped = locationHistory.map(h => {
+            const d = new Date(h.date);
+            const dayIdx = (d.getDay() + 6) % 7;
+            return { date: days[dayIdx], value: Math.round(h.diversityScore) };
+          });
+          setWeeklyLocationDiversity(mapped);
+        }
+
+        const sunlightHistory = await getSunlightDailyHistory(7);
+        if (sunlightHistory.length > 0) {
+          const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+          const mapped = sunlightHistory.map(h => {
+            const d = new Date(h.date);
+            const dayIdx = (d.getDay() + 6) % 7;
+            return { date: days[dayIdx], value: Math.round(h.totalOutdoorMinutes) };
+          });
+          setWeeklySunlight(mapped);
+        }
+      }
+
+      // Use mock data for development (Expo Go / web)
+      if (!locationDiversity) {
+        setLocationDiversity(getMockLocationDiversity());
+        setWeeklyLocationDiversity(getMockWeeklyLocationDiversity());
+      }
+      if (!sunlightExposure) {
+        setSunlightExposure(getMockSunlightExposure());
+        setWeeklySunlight(getMockWeeklySunlight());
+      }
+
+      // Try to start real sensors (will silently no-op if unavailable)
+      try {
+        const lightAvailable = await isLightSensorAvailable();
+        if (lightAvailable) {
+          const unsubscribe = await startSunlightMonitoring((reading) => {
+            if (dbReadyRef.current) {
+              insertSunlightSample(reading).catch(() => {});
+            }
+            // Update exposure summary periodically
+            setSunlightExposure(prev => {
+              if (!prev) return prev;
+              const newOutdoorMin = prev.totalOutdoorMinutes + (reading.isOutdoors ? 1 : 0);
+              const hour = new Date().getHours();
+              const inWindow = hour >= 10 && hour < 15;
+              const newOptimalMin = prev.optimalWindowMinutes + (reading.isOutdoors && inWindow ? 1 : 0);
+              const updated: SunlightExposureSummary = {
+                ...prev,
+                totalOutdoorMinutes: newOutdoorMin,
+                optimalWindowMinutes: newOptimalMin,
+                peakLux: Math.max(prev.peakLux, reading.luxValue),
+                goalProgress: Math.min(1, newOutdoorMin / prev.goalMinutes),
+                isVitaminDWindow: inWindow,
+              };
+              if (dbReadyRef.current) upsertSunlightDaily(updated).catch(() => {});
+              return updated;
+            });
+          });
+        }
+      } catch (e) {
+        console.warn('[Seren] Sensor init failed (using mock):', e);
+      }
+    } catch (e) {
+      console.warn('[Seren] Location/Sunlight init failed:', e);
+      // Fallback to mock
+      setLocationDiversity(getMockLocationDiversity());
+      setSunlightExposure(getMockSunlightExposure());
+      setWeeklyLocationDiversity(getMockWeeklyLocationDiversity());
+      setWeeklySunlight(getMockWeeklySunlight());
     }
   }
 
@@ -513,7 +640,10 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       notifyHighStress(stressPred);
       notifySustainedAnxiety(anxietyPred);
 
-      const recs = generateRecommendations(stressPred, anxietyPred, lastSleep, lastCheckin, baseline, []);
+      const recs = generateRecommendations(
+        stressPred, anxietyPred, lastSleep, lastCheckin, baseline, [],
+        locationDiversity, sunlightExposure,
+      );
       setRecommendations(recs);
 
       if (dbReadyRef.current) {
@@ -638,6 +768,10 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     setAnomalies([]);
     setSleepTrend(DEFAULT_SLEEP_TREND);
     setCheckinTrend(DEFAULT_CHECKIN_TREND);
+    setLocationDiversity(null);
+    setSunlightExposure(null);
+    setWeeklyLocationDiversity([]);
+    setWeeklySunlight([]);
 
     if (dbReadyRef.current) {
       try { await dbDeleteAllData(); } catch { /* ignore */ }
@@ -672,8 +806,10 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const value: WellnessContextValue = {
     stress, anxiety, lastSleep, sleepTrend, baseline, anomalies,
     recommendations, features, heartRate, hrv,
+    locationDiversity, sunlightExposure,
     lastCheckin, checkinHistory, checkinTrend, performCheckin,
     weeklyStress, weeklyHrv, weeklySleep,
+    weeklyLocationDiversity, weeklySunlight,
     monthlySleepGrid, hrvTrendData,
     modelLoaded, watchConnected, healthConnectAvailable,
     lastSyncTime, isLive, dbReady,

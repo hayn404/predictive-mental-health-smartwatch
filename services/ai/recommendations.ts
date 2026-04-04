@@ -21,6 +21,8 @@ import {
   SleepAnalysis,
   CheckinAnalysis,
   PersonalBaseline,
+  LocationDiversitySummary,
+  SunlightExposureSummary,
 } from './types';
 
 // ============================================================
@@ -239,6 +241,70 @@ const INTERVENTIONS: InterventionTemplate[] = [
     evidenceLevel: 'strong',
     citation: 'Holt-Lunstad et al. (2010). Social relationships and mortality risk. PLoS Med.',
   },
+
+  // ---- Outdoor / Sunlight ----
+  {
+    id: 'outdoor_sunlight',
+    category: 'outdoor',
+    title: 'Get Some Sunlight',
+    description: 'Sunlight exposure helps regulate your circadian rhythm and boosts serotonin production.',
+    durationMin: 15,
+    instructions: [
+      'Step outside for 15 minutes',
+      'Leave your sunglasses off if possible (safe for short periods)',
+      'Walk or sit in a sunny area',
+      'The best time is between 10am and 3pm for vitamin D synthesis',
+    ],
+    evidenceLevel: 'strong',
+    citation: 'Holick, M. (2007). Vitamin D deficiency. N Engl J Med.',
+  },
+  {
+    id: 'outdoor_walk_sunshine',
+    category: 'outdoor',
+    title: 'Sunshine Walk',
+    description: 'A walk in daylight combines physical activity with light exposure — a double mood booster.',
+    durationMin: 20,
+    instructions: [
+      'Head outside during daylight hours',
+      'Walk at a comfortable pace for 20 minutes',
+      'Try to stay in sunlit areas',
+      'Pay attention to how the warmth feels on your skin',
+    ],
+    evidenceLevel: 'strong',
+    citation: 'Mead et al. (2009). Exercise for depression. Cochrane Database Syst Rev.',
+  },
+
+  // ---- Exploration / Location Diversity ----
+  {
+    id: 'explore_new_place',
+    category: 'exploration',
+    title: 'Explore Somewhere New',
+    description: 'Breaking routine by visiting a new place can lift mood and reduce depressive patterns.',
+    durationMin: 30,
+    instructions: [
+      'Think of a place you have not been to recently — a park, cafe, or neighborhood',
+      'Take a different route than usual',
+      'Notice your surroundings with curiosity',
+      'Even a short detour from your routine counts',
+    ],
+    evidenceLevel: 'moderate',
+    citation: 'Heller et al. (2020). Association between real-world experiential diversity and positive affect. Nature Neuroscience.',
+  },
+  {
+    id: 'explore_nature',
+    category: 'exploration',
+    title: 'Visit a Green Space',
+    description: 'Time in nature reduces cortisol and improves mood. Even 20 minutes helps.',
+    durationMin: 20,
+    instructions: [
+      'Find a nearby park, garden, or green area',
+      'Walk slowly and notice the natural surroundings',
+      'Sit for a few minutes and listen to the ambient sounds',
+      'Leave your phone on silent if you can',
+    ],
+    evidenceLevel: 'strong',
+    citation: 'Hunter et al. (2019). Urban nature experiences reduce stress. Front Psychol.',
+  },
 ];
 
 // ============================================================
@@ -278,6 +344,8 @@ export function generateRecommendations(
   lastCheckin: CheckinAnalysis | null,
   baseline: PersonalBaseline | null,
   recentRecommendations: string[] = [],
+  locationDiversity: LocationDiversitySummary | null = null,
+  sunlightExposure: SunlightExposureSummary | null = null,
 ): Recommendation[] {
   const candidates: Recommendation[] = [];
   const now = new Date();
@@ -382,6 +450,49 @@ export function generateRecommendations(
       makeRecommendation('journaling_gratitude', 'schedule',
         'Start your morning with a brief gratitude reflection', 0.3),
     );
+  }
+
+  // ---- Location diversity-triggered recommendations ----
+  if (locationDiversity) {
+    if (locationDiversity.isMonotonous) {
+      candidates.push(
+        makeRecommendation('explore_new_place', 'pattern',
+          'Your routine has been limited to the same places — try somewhere new', 0.7),
+      );
+    }
+    if (locationDiversity.diversityScore < 20) {
+      candidates.push(
+        makeRecommendation('explore_nature', 'pattern',
+          `Location diversity is low (${locationDiversity.diversityScore}/100) — a change of scenery can help`, 0.6),
+      );
+    }
+    if (locationDiversity.isMonotonous && stress.stressScore >= THRESHOLDS.stressElevated) {
+      candidates.push(
+        makeRecommendation('explore_nature', 'pattern',
+          'High stress + repetitive routine — nature exposure can break the cycle', 0.8),
+      );
+    }
+  }
+
+  // ---- Sunlight exposure-triggered recommendations ----
+  if (sunlightExposure) {
+    if (sunlightExposure.goalProgress < 0.5 && sunlightExposure.isVitaminDWindow) {
+      candidates.push(
+        makeRecommendation('outdoor_sunlight', 'pattern',
+          `Only ${sunlightExposure.totalOutdoorMinutes}m of sunlight today — the vitamin D window is open now`, 0.8),
+      );
+    } else if (sunlightExposure.goalProgress < 0.5 && hour < 15) {
+      candidates.push(
+        makeRecommendation('outdoor_walk_sunshine', 'schedule',
+          `You've had ${sunlightExposure.totalOutdoorMinutes}m of outdoor time — try to get more before 3pm`, 0.6),
+      );
+    }
+    if (sunlightExposure.totalOutdoorMinutes < 10 && hour >= 14) {
+      candidates.push(
+        makeRecommendation('outdoor_sunlight', 'pattern',
+          'Very low sunlight exposure today — even 15 minutes helps your mood', 0.75),
+      );
+    }
   }
 
   // ---- Filter out recently shown recommendations ----

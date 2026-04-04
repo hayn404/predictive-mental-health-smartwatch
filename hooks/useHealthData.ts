@@ -52,7 +52,7 @@ export function useHealthData() {
 
   const watchStatus: WatchStatus = {
     connected: w.watchConnected,
-    model: 'Galaxy Watch',
+    model: 'Smartwatch',
     lastSync: w.lastSyncTime,
     batteryLevel: 85,
   };
@@ -74,6 +74,12 @@ export function useHealthData() {
     keyInsights: c.keyInsights,
   }));
 
+  // Location & Sunlight
+  const locationDiversity = w.locationDiversity;
+  const sunlightExposure = w.sunlightExposure;
+  const weeklyLocationDiversity = w.weeklyLocationDiversity;
+  const weeklySunlight = w.weeklySunlight;
+
   return {
     health,
     weeklyData,
@@ -82,6 +88,10 @@ export function useHealthData() {
     watchStatus,
     recommendations,
     checkinHistory,
+    locationDiversity,
+    sunlightExposure,
+    weeklyLocationDiversity,
+    weeklySunlight,
     isLive: w.isLive,
     toggleLive: w.toggleLive,
   };

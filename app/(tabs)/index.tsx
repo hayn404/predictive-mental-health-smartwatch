@@ -18,7 +18,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { stress, anxiety, lastSleep, heartRate, recommendations } = useWellness();
+  const { stress, anxiety, lastSleep, heartRate, recommendations, sunlightExposure, locationDiversity } = useWellness();
 
   return (
     <View style={[styles.container, { backgroundColor: Colors.cream }]}>
@@ -116,14 +116,56 @@ export default function HomeScreen() {
             <View style={[styles.sunlightIconBg, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
               <MaterialIcons name="wb-sunny" size={24} color={Colors.warning} />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.metricLabel}>Sunlight Exposure</Text>
-              <Text style={styles.metricSubInfo}>Daily Goal: 30 mins</Text>
+              <Text style={styles.metricSubInfo}>
+                {sunlightExposure?.isVitaminDWindow ? 'Vitamin D window open now!' : 'Daily Goal: 30 mins'}
+              </Text>
+              {/* Progress bar */}
+              <View style={styles.progressBarBg}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      width: `${Math.min(100, (sunlightExposure?.goalProgress ?? 0) * 100)}%`,
+                      backgroundColor: (sunlightExposure?.goalProgress ?? 0) >= 1 ? Colors.sageGreen : Colors.warning,
+                    },
+                  ]}
+                />
+              </View>
             </View>
           </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={[styles.metricValue, { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary }]}>15m</Text>
+          <View style={{ alignItems: 'flex-end', minWidth: 50 }}>
+            <Text style={[styles.metricValue, { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary }]}>
+              {sunlightExposure ? `${sunlightExposure.totalOutdoorMinutes}m` : '—'}
+            </Text>
             <Text style={styles.liveTextSmall}>Today</Text>
+          </View>
+        </GlassCard>
+
+        {/* Location Diversity Card */}
+        <GlassCard variant="default" style={styles.sunlightCard}>
+          <View style={styles.sunlightLeft}>
+            <View style={[styles.sunlightIconBg, { backgroundColor: '#F3F0FF', borderColor: '#E8E0FF' }]}>
+              <MaterialIcons name="place" size={24} color={Colors.violet} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.metricLabel}>Location Diversity</Text>
+              <Text style={styles.metricSubInfo}>
+                {locationDiversity
+                  ? `${locationDiversity.uniquePlacesVisited} place${locationDiversity.uniquePlacesVisited !== 1 ? 's' : ''} visited today`
+                  : 'Tracking your routine'}
+              </Text>
+              {locationDiversity?.isMonotonous && (
+                <Text style={styles.monotonousHint}>Try visiting somewhere new today</Text>
+              )}
+            </View>
+          </View>
+          <View style={{ alignItems: 'flex-end', minWidth: 50 }}>
+            <Text style={[styles.metricValue, { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary }]}>
+              {locationDiversity ? `${locationDiversity.diversityScore}` : '—'}
+            </Text>
+            <Text style={styles.liveTextSmall}>/100</Text>
           </View>
         </GlassCard>
 
@@ -447,5 +489,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+  },
+  progressBarBg: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#F3F4F6',
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  monotonousHint: {
+    fontSize: 11,
+    color: Colors.violet,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

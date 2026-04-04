@@ -14,11 +14,19 @@ import {
   DBBiometricSample,
   DBFeatureWindow,
   DBSleepSession,
+  DBLocationVisit,
+  DBLocationDiversity,
+  DBSunlightSample,
+  DBSunlightDaily,
   BiometricFeatureVector,
   PersonalBaseline,
   SleepAnalysis,
   CheckinAnalysis,
   Recommendation,
+  LocationVisit,
+  LocationDiversitySummary,
+  SunlightReading,
+  SunlightExposureSummary,
 } from './types';
 
 // ============================================================
@@ -116,10 +124,54 @@ const CREATE_TABLES = `
     data_json TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS location_visits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    visit_id TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    departure_time INTEGER NOT NULL,
+    latitude REAL NOT NULL,
+    longitude REAL NOT NULL,
+    label TEXT DEFAULT 'unknown',
+    cluster_index INTEGER DEFAULT -1
+  );
+
+  CREATE TABLE IF NOT EXISTS location_diversity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL UNIQUE,
+    unique_places INTEGER,
+    total_transitions INTEGER,
+    diversity_score REAL,
+    home_time_pct REAL,
+    work_time_pct REAL,
+    novel_places INTEGER,
+    is_monotonous INTEGER DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS sunlight_samples (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER NOT NULL,
+    lux_value REAL NOT NULL,
+    is_outdoors INTEGER DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS sunlight_daily (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL UNIQUE,
+    total_outdoor_min REAL,
+    optimal_window_min REAL,
+    peak_lux REAL,
+    avg_outdoor_lux REAL,
+    goal_minutes REAL DEFAULT 30
+  );
+
   CREATE INDEX IF NOT EXISTS idx_biometric_ts ON biometric_samples(timestamp);
   CREATE INDEX IF NOT EXISTS idx_features_ts ON feature_windows(timestamp);
   CREATE INDEX IF NOT EXISTS idx_sleep_date ON sleep_sessions(date);
   CREATE INDEX IF NOT EXISTS idx_checkins_ts ON checkins(timestamp);
+  CREATE INDEX IF NOT EXISTS idx_location_visits_ts ON location_visits(timestamp);
+  CREATE INDEX IF NOT EXISTS idx_sunlight_ts ON sunlight_samples(timestamp);
+  CREATE INDEX IF NOT EXISTS idx_sunlight_daily_date ON sunlight_daily(date);
+  CREATE INDEX IF NOT EXISTS idx_location_div_date ON location_diversity(date);
 `;
 
 // ============================================================
@@ -361,6 +413,139 @@ export async function getRecentRecommendationIds(hours: number = 4): Promise<str
 }
 
 // ============================================================
+// Location Visits
+// ============================================================
+
+export async function insertLocationVisit(visit: LocationVisit): Promise<number> {
+  const result = await getDb().runAsync(
+    `INSERT INTO location_visits (visit_id, timestamp, departure_time, latitude, longitude, label, cluster_index)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    visit.id, visit.timestamp, visit.departureTime,
+    visit.latitude, visit.longitude, visit.label, visit.clusterIndex,
+  );
+  return result.lastInsertRowId;
+}
+
+export async function getLocationVisits(startTime: number, endTime: number): Promise<LocationVisit[]> {
+  const rows = await getDb().getAllAsync<DBLocationVisit>(
+    'SELECT * FROM location_visits WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp',
+    startTime, endTime,
+  );
+  return rows.map(r => ({
+    id: r.visit_id,
+    timestamp: r.timestamp,
+    departureTime: r.departure_time,
+    latitude: r.latitude,
+    longitude: r.longitude,
+    label: r.label,
+    clusterIndex: r.cluster_index,
+  }));
+}
+
+export async function upsertLocationDiversity(summary: LocationDiversitySummary): Promise<void> {
+  await getDb().runAsync(
+    `INSERT OR REPLACE INTO location_diversity (date, unique_places, total_transitions, diversity_score, home_time_pct, work_time_pct, novel_places, is_monotonous)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    summary.date, summary.uniquePlacesVisited, summary.totalTransitions,
+    summary.diversityScore, summary.homeTimePercent, summary.workTimePercent,
+    summary.novelPlaces, summary.isMonotonous ? 1 : 0,
+  );
+}
+
+export async function getTodayLocationDiversity(): Promise<LocationDiversitySummary | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const row = await getDb().getFirstAsync<DBLocationDiversity>(
+    'SELECT * FROM location_diversity WHERE date = ?', today,
+  );
+  return row ? rowToLocationDiversity(row) : null;
+}
+
+export async function getLocationDiversityHistory(days: number): Promise<LocationDiversitySummary[]> {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const rows = await getDb().getAllAsync<DBLocationDiversity>(
+    'SELECT * FROM location_diversity WHERE date >= ? ORDER BY date', cutoff,
+  );
+  return rows.map(rowToLocationDiversity);
+}
+
+function rowToLocationDiversity(row: DBLocationDiversity): LocationDiversitySummary {
+  return {
+    date: row.date,
+    uniquePlacesVisited: row.unique_places,
+    totalTransitions: row.total_transitions,
+    diversityScore: row.diversity_score,
+    homeTimePercent: row.home_time_pct,
+    workTimePercent: row.work_time_pct,
+    novelPlaces: row.novel_places,
+    isMonotonous: row.is_monotonous === 1,
+  };
+}
+
+// ============================================================
+// Sunlight Samples & Daily Summaries
+// ============================================================
+
+export async function insertSunlightSample(reading: SunlightReading): Promise<number> {
+  const result = await getDb().runAsync(
+    `INSERT INTO sunlight_samples (timestamp, lux_value, is_outdoors) VALUES (?, ?, ?)`,
+    reading.timestamp, reading.luxValue, reading.isOutdoors ? 1 : 0,
+  );
+  return result.lastInsertRowId;
+}
+
+export async function getSunlightSamples(startTime: number, endTime: number): Promise<SunlightReading[]> {
+  const rows = await getDb().getAllAsync<DBSunlightSample>(
+    'SELECT * FROM sunlight_samples WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp',
+    startTime, endTime,
+  );
+  return rows.map(r => ({
+    timestamp: r.timestamp,
+    luxValue: r.lux_value,
+    isOutdoors: r.is_outdoors === 1,
+  }));
+}
+
+export async function upsertSunlightDaily(summary: SunlightExposureSummary): Promise<void> {
+  await getDb().runAsync(
+    `INSERT OR REPLACE INTO sunlight_daily (date, total_outdoor_min, optimal_window_min, peak_lux, avg_outdoor_lux, goal_minutes)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    summary.date, summary.totalOutdoorMinutes, summary.optimalWindowMinutes,
+    summary.peakLux, summary.avgOutdoorLux, summary.goalMinutes,
+  );
+}
+
+export async function getTodaySunlightDaily(): Promise<SunlightExposureSummary | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const row = await getDb().getFirstAsync<DBSunlightDaily>(
+    'SELECT * FROM sunlight_daily WHERE date = ?', today,
+  );
+  return row ? rowToSunlightSummary(row) : null;
+}
+
+export async function getSunlightDailyHistory(days: number): Promise<SunlightExposureSummary[]> {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const rows = await getDb().getAllAsync<DBSunlightDaily>(
+    'SELECT * FROM sunlight_daily WHERE date >= ? ORDER BY date', cutoff,
+  );
+  return rows.map(rowToSunlightSummary);
+}
+
+function rowToSunlightSummary(row: DBSunlightDaily): SunlightExposureSummary {
+  const now = new Date();
+  const hour = now.getHours();
+  return {
+    date: row.date,
+    totalOutdoorMinutes: row.total_outdoor_min,
+    optimalWindowMinutes: row.optimal_window_min,
+    peakLux: row.peak_lux,
+    avgOutdoorLux: row.avg_outdoor_lux,
+    goalMinutes: row.goal_minutes,
+    goalProgress: row.goal_minutes > 0 ? Math.min(1, row.total_outdoor_min / row.goal_minutes) : 0,
+    isVitaminDWindow: hour >= 10 && hour < 15,
+  };
+}
+
+// ============================================================
 // Data Retention & Cleanup
 // ============================================================
 
@@ -390,6 +575,10 @@ export async function cleanupOldData(
     now - sleepDays * 86400000,
   );
 
+  // Clean up location and sunlight data (keep 30 days for samples, 365 for summaries)
+  await getDb().runAsync('DELETE FROM location_visits WHERE timestamp < ?', now - biometricDays * 86400000);
+  await getDb().runAsync('DELETE FROM sunlight_samples WHERE timestamp < ?', now - biometricDays * 86400000);
+
   return {
     biometric: r1.changes,
     features: r2.changes,
@@ -404,6 +593,7 @@ export async function deleteAllData(): Promise<void> {
   const tables = [
     'biometric_samples', 'feature_windows', 'sleep_sessions',
     'baselines', 'checkins', 'recommendations_log',
+    'location_visits', 'location_diversity', 'sunlight_samples', 'sunlight_daily',
   ];
   for (const table of tables) {
     await getDb().runAsync(`DELETE FROM ${table}`);

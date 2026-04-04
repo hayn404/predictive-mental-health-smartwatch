@@ -314,7 +314,9 @@ export type InterventionCategory =
   | 'meditation'
   | 'journaling'
   | 'sleep_hygiene'
-  | 'social';
+  | 'social'
+  | 'outdoor'
+  | 'exploration';
 
 export type RecommendationTrigger = 'biometric' | 'schedule' | 'pattern' | 'checkin' | 'user_request';
 
@@ -403,4 +405,98 @@ export interface DBSleepSession {
   quality_score: number;
   recovery_score: number;
   stages_json: string;      // Serialized RawSleepStage[]
+}
+
+// ----------------------------------------------------------
+// LOCATION DIVERSITY TRACKING
+// ----------------------------------------------------------
+
+/** A detected location visit (clustered from raw GPS) */
+export interface LocationVisit {
+  id: string;
+  timestamp: number;          // Arrival time (Unix ms)
+  departureTime: number;      // Departure time (Unix ms)
+  latitude: number;
+  longitude: number;
+  label: string;              // 'home' | 'work' | 'unknown_1' | etc.
+  clusterIndex: number;       // Which cluster this belongs to
+}
+
+/** Daily location diversity summary */
+export interface LocationDiversitySummary {
+  date: string;               // YYYY-MM-DD
+  uniquePlacesVisited: number;
+  totalTransitions: number;   // Number of place changes
+  diversityScore: number;     // 0-100 (0 = one place, 100 = highly varied)
+  homeTimePercent: number;    // 0-1
+  workTimePercent: number;    // 0-1
+  novelPlaces: number;        // Places visited for the first time this week
+  isMonotonous: boolean;      // True if only home <-> work pattern
+}
+
+/** DB row for location visits */
+export interface DBLocationVisit {
+  id: number;
+  visit_id: string;
+  timestamp: number;
+  departure_time: number;
+  latitude: number;
+  longitude: number;
+  label: string;
+  cluster_index: number;
+}
+
+/** DB row for daily location diversity */
+export interface DBLocationDiversity {
+  id: number;
+  date: string;
+  unique_places: number;
+  total_transitions: number;
+  diversity_score: number;
+  home_time_pct: number;
+  work_time_pct: number;
+  novel_places: number;
+  is_monotonous: number;      // 0 or 1
+}
+
+// ----------------------------------------------------------
+// SUNLIGHT EXPOSURE TRACKING
+// ----------------------------------------------------------
+
+/** A single sunlight sensor reading */
+export interface SunlightReading {
+  timestamp: number;          // Unix ms
+  luxValue: number;           // Raw lux from light sensor
+  isOutdoors: boolean;        // lux > threshold (1000 lux)
+}
+
+/** Daily sunlight exposure summary */
+export interface SunlightExposureSummary {
+  date: string;               // YYYY-MM-DD
+  totalOutdoorMinutes: number;
+  optimalWindowMinutes: number;  // Minutes outdoors during 10am-3pm (vitamin D window)
+  peakLux: number;
+  avgOutdoorLux: number;
+  goalMinutes: number;        // Default 30
+  goalProgress: number;       // 0-1
+  isVitaminDWindow: boolean;  // Whether current time is 10am-3pm
+}
+
+/** DB row for sunlight samples */
+export interface DBSunlightSample {
+  id: number;
+  timestamp: number;
+  lux_value: number;
+  is_outdoors: number;        // 0 or 1
+}
+
+/** DB row for daily sunlight summary */
+export interface DBSunlightDaily {
+  id: number;
+  date: string;
+  total_outdoor_min: number;
+  optimal_window_min: number;
+  peak_lux: number;
+  avg_outdoor_lux: number;
+  goal_minutes: number;
 }

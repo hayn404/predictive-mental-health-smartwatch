@@ -28,7 +28,7 @@ export interface WatchStatus {
 
 export interface Recommendation {
   id: string;
-  category: 'breathing' | 'physical' | 'journaling' | 'meditation';
+  category: 'breathing' | 'physical' | 'journaling' | 'meditation' | 'sleep_hygiene' | 'social' | 'outdoor' | 'exploration';
   title: string;
   description: string;
   duration: string;
@@ -88,8 +88,8 @@ export const getHRVTrend = (): { time: string; value: number }[] => [
 // Watch status
 export const getWatchStatus = (): WatchStatus => ({
   connected: true,
-  batteryLevel: 73,
-  model: 'Apple Watch Series 9',
+  batteryLevel: 85,
+  model: 'Smartwatch',
   lastSync: new Date(Date.now() - 3 * 60 * 1000),
 });
 

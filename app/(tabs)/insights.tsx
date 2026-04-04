@@ -21,7 +21,7 @@ type TabType = typeof TABS[number];
 export default function InsightsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { weeklyData, monthlySleep, hrvTrend } = useHealthData();
+  const { weeklyData, monthlySleep, hrvTrend, weeklyLocationDiversity, weeklySunlight } = useHealthData();
   const [activeTab, setActiveTab] = useState<TabType>('Daily');
 
   const stressChartData = weeklyData.map(d => ({ label: d.date, value: d.stress }));
@@ -163,6 +163,74 @@ export default function InsightsScreen() {
               <View style={[styles.sleepLegendDot, { backgroundColor: '#60A5FA' }]} />
             </View>
             <Text style={styles.sleepLegendLabel}>HIGH QUALITY</Text>
+          </View>
+        </View>
+
+        {/* Weekly Sunlight Exposure */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeaderRow}>
+            <View style={styles.chartTitleContainer}>
+              <MaterialIcons name="wb-sunny" size={20} color={Colors.warning} />
+              <View>
+                <Text style={styles.chartTitle}>Sunlight Exposure</Text>
+                <Text style={styles.chartSubTitle}>Minutes outdoors per day</Text>
+              </View>
+            </View>
+            <View style={[styles.sleepBadge, { backgroundColor: '#FEF3C7' }]}>
+              <Text style={[styles.sleepBadgeText, { color: '#92400E' }]}>Goal: 30m</Text>
+            </View>
+          </View>
+
+          {weeklySunlight.length > 0 ? (
+            <BarChart
+              color={Colors.warning}
+              data={weeklySunlight.map(d => ({
+                label: d.date,
+                value: d.value,
+                color: d.value >= 30 ? Colors.sageGreen : d.value >= 15 ? Colors.warning : Colors.error,
+              }))}
+            />
+          ) : (
+            <View style={styles.emptyChartPlaceholder}>
+              <MaterialIcons name="wb-sunny" size={32} color={Colors.textMuted} />
+              <Text style={styles.emptyChartText}>Sunlight data will appear here</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Weekly Location Diversity */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeaderRow}>
+            <View style={styles.chartTitleContainer}>
+              <MaterialIcons name="place" size={20} color={Colors.violet} />
+              <View>
+                <Text style={styles.chartTitle}>Location Diversity</Text>
+                <Text style={styles.chartSubTitle}>Variety of places visited</Text>
+              </View>
+            </View>
+          </View>
+
+          {weeklyLocationDiversity.length > 0 ? (
+            <BarChart
+              color={Colors.violet}
+              data={weeklyLocationDiversity.map(d => ({
+                label: d.date,
+                value: d.value,
+                color: d.value >= 50 ? Colors.sageGreen : d.value >= 20 ? Colors.warning : Colors.error,
+              }))}
+            />
+          ) : (
+            <View style={styles.emptyChartPlaceholder}>
+              <MaterialIcons name="place" size={32} color={Colors.textMuted} />
+              <Text style={styles.emptyChartText}>Location data will appear here</Text>
+            </View>
+          )}
+
+          <View style={styles.insightTipRow}>
+            <MaterialIcons name="info-outline" size={14} color={Colors.violet} />
+            <Text style={styles.insightTipText}>
+              Research shows that visiting diverse locations is linked to better mood and lower depression risk.
+            </Text>
           </View>
         </View>
 
@@ -457,5 +525,30 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: 'bold',
     color: Colors.textPrimary,
+  },
+  emptyChartPlaceholder: {
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  emptyChartText: {
+    fontSize: FontSize.sm,
+    color: Colors.textMuted,
+  },
+  insightTipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  insightTipText: {
+    flex: 1,
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    lineHeight: 18,
   },
 });
