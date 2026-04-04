@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Seren</string>
+    <string name="tile_label">Seren Wellness</string>
+    <string name="tile_description">Quick view of your stress level and heart rate</string>
+</resources>
