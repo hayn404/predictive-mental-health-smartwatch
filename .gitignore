@@ -46,3 +46,7 @@ ml/data/
 ml/models/*.joblib
 __pycache__/
 *.pyc
+wearos/app/build/
+wearos/.gradle/
+wearos/.idea/
+android/
