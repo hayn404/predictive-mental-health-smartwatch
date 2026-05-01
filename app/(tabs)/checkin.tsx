@@ -82,7 +82,7 @@ export default function CheckinScreen() {
               <MaterialIcons name="chevron-left" size={28} color={Colors.textPrimary} />
             </TouchableOpacity>
             <View style={styles.appIconContainer}>
-              <Image source={require('@/assets/images/logo.png')} style={styles.appIcon} />
+              <Image source={require('@/assets/images/seren-brain.png')} style={styles.appIcon} />
             </View>
             <Text style={styles.title}>Check-in</Text>
           </View>

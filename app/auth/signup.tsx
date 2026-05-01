@@ -51,8 +51,9 @@ export default function SignUpScreen() {
       setError(result.error);
     } else if (result.needsEmailConfirmation) {
       setSuccess(true);
+    } else if (result.user) {
+      router.replace('/onboarding/welcome' as any);
     }
-    // If user is returned directly, auth state change will trigger navigation
   };
 
   if (success) {
@@ -91,7 +92,7 @@ export default function SignUpScreen() {
         {/* Logo */}
         <View style={styles.logoSection}>
           <View style={styles.logoContainer}>
-            <Image source={require('@/assets/images/logo.png')} style={styles.logo} />
+            <Image source={require('@/assets/images/seren-brain.png')} style={styles.logo} />
           </View>
           <Text style={styles.appName}>Seren</Text>
         </View>

@@ -4,12 +4,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/hooks/useAuth';
 
 export function DraggableFAB() {
     const router = useRouter();
     const pathname = usePathname();
     const insets = useSafeAreaInsets();
     const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+    const { isAuthenticated, initialized } = useAuth();
 
     const FAB_SIZE = 56;
 
@@ -72,8 +74,11 @@ export function DraggableFAB() {
         })
     ).current;
 
-    // Hide FAB on onboarding pages ONLY. Wait for router to mount before aggressive hiding.
-    if (pathname && pathname.includes('/onboarding')) {
+    // Hide FAB on auth, onboarding, and index pages, or when user isn't authenticated yet
+    if (!initialized || !isAuthenticated) {
+        return null;
+    }
+    if (pathname && (pathname.includes('/onboarding') || pathname.includes('/auth') || pathname === '/')) {
         return null;
     }
 

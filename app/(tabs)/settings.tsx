@@ -21,7 +21,7 @@ import { useAuth } from '@/hooks/useAuth';
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { watchConnected, lastSyncTime, deleteAllData, exportData, requestHealthConnectPermissions, healthConnectAvailable, llmConfigured, llmProvider, whisperConfigured } = useWellness();
+  const { watchConnected, lastSyncTime, deleteAllData, exportData, requestHealthConnectPermissions, healthConnectAvailable } = useWellness();
   const { showAlert } = useAlert();
   const { user, logout } = useAuth();
 
@@ -141,7 +141,7 @@ export default function SettingsScreen() {
               <MaterialIcons name="chevron-left" size={28} color={Colors.textPrimary} />
             </TouchableOpacity>
             <View style={styles.appIconContainer}>
-              <Image source={require('@/assets/images/logo.png')} style={styles.appIcon} />
+              <Image source={require('@/assets/images/seren-brain.png')} style={styles.appIcon} />
             </View>
             <Text style={styles.title}>Settings</Text>
           </View>
@@ -275,49 +275,6 @@ export default function SettingsScreen() {
             value={analytics}
             onValueChange={setAnalytics}
           />
-        </GlassCard>
-
-        {/* AI Services */}
-        <Text style={styles.sectionLabel}>AI Services</Text>
-        <GlassCard variant="default" style={styles.settingsGroup}>
-          {/* Status Row — LLM */}
-          <View style={styles.settingRow}>
-            <View style={[styles.settingIcon, { backgroundColor: Colors.violet + '18' }]}>
-              <MaterialIcons name="psychology" size={18} color={Colors.violet} />
-            </View>
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>Emotional Analysis (LLM)</Text>
-              <Text style={styles.settingSubLabel}>
-                {llmConfigured ? `Connected (${llmProvider})` : 'Not configured'}
-              </Text>
-            </View>
-            <View style={[styles.llmStatusDot, { backgroundColor: llmConfigured ? Colors.sageGreen : Colors.warmGray300 }]} />
-          </View>
-          <View style={styles.rowDivider} />
-
-          {/* Status Row — Whisper */}
-          <View style={styles.settingRow}>
-            <View style={[styles.settingIcon, { backgroundColor: Colors.softBlue + '18' }]}>
-              <MaterialIcons name="hearing" size={18} color={Colors.softBlue} />
-            </View>
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>Voice Transcription (Whisper)</Text>
-              <Text style={styles.settingSubLabel}>
-                {whisperConfigured ? 'Connected' : 'Not configured'}
-              </Text>
-            </View>
-            <View style={[styles.llmStatusDot, { backgroundColor: whisperConfigured ? Colors.sageGreen : Colors.warmGray300 }]} />
-          </View>
-          <View style={styles.rowDivider} />
-
-          {/* Config hint */}
-          <View style={styles.apiKeySection}>
-            <Text style={styles.apiKeyHint}>
-              {llmConfigured
-                ? `Provider: ${llmProvider} | Voice: ${whisperConfigured ? 'Whisper STT' : 'Text only'}\nAnalysis includes biometric cross-referencing with stress, sleep, and HRV data.`
-                : 'AI services are configured in services/ai/aiConfig.ts.\nAdd your API key there to enable real voice transcription and deep emotional analysis.'}
-            </Text>
-          </View>
         </GlassCard>
 
         {/* Clinical Tools */}

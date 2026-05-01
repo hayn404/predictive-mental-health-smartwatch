@@ -1,36 +1,23 @@
 /**
  * Seren AI — Central Configuration
  * ===================================
- * Put your API keys here. Both LLM (emotional analysis) and
- * Whisper (voice transcription) auto-configure on app startup.
- *
- * Supported providers:
- *   - 'groq'   — Free tier, fast (recommended for development)
- *   - 'openai'  — GPT-4o-mini + Whisper
- *   - 'ollama'  — Local LLM only (no voice transcription)
+ * API keys are loaded from environment variables (never committed to source).
+ * Configure them in your .env file:
+ *   EXPO_PUBLIC_OPENROUTER_API_KEY=sk-or-v1-...
+ *   EXPO_PUBLIC_GROQ_API_KEY=gsk_...  (optional, for voice transcription)
  */
 
 import { configureLLMPreset } from './llmService';
 import { configureWhisper } from './whisperService';
 
 // ============================================================
-// YOUR API KEYS — edit these values
+// Internal configuration — API keys from env vars (secrets)
 // ============================================================
 
-const AI_CONFIG = {
-  /** Which provider to use: 'groq' | 'openai' | 'ollama' */
-  provider: 'groq' as 'openai' | 'groq' | 'ollama',
+const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '';
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || '';
 
-  /** Your API key (get one free at https://console.groq.com or https://platform.openai.com) */
-  apiKey: '',  // Set your API key here or use environment variable
-
-  /**
-   * Language for voice transcription (ISO 639-1).
-   * Examples: 'en' for English, 'ar' for Arabic
-   * Leave empty for auto-detect.
-   */
-  language: 'en',
-};
+const LANGUAGE = 'en';
 
 // ============================================================
 // Auto-initialization (called once on app startup)
@@ -39,7 +26,7 @@ const AI_CONFIG = {
 let _initialized = false;
 
 /**
- * Initialize AI services from the config above.
+ * Initialize AI services from environment variables.
  * Call this once in the app entry point (e.g., WellnessProvider).
  * Safe to call multiple times — only runs once.
  */
@@ -47,35 +34,31 @@ export function initializeAIServices(): void {
   if (_initialized) return;
   _initialized = true;
 
-  const { provider, apiKey } = AI_CONFIG;
-
-  if (!apiKey) {
-    console.log('[Seren AI] No API key configured — using local fallback analysis.');
-    console.log('[Seren AI] To enable real AI, add your key in services/ai/aiConfig.ts');
-    return;
+  // Configure LLM with OpenRouter (emotional analysis)
+  if (OPENROUTER_API_KEY) {
+    configureLLMPreset('openrouter', OPENROUTER_API_KEY);
+    console.log('[Seren AI] LLM configured: OpenRouter');
+  } else {
+    console.log('[Seren AI] OpenRouter key not set — using local fallback analysis.');
   }
 
-  // Configure LLM (emotional analysis)
-  configureLLMPreset(provider, apiKey);
-  console.log(`[Seren AI] LLM configured: ${provider}`);
-
-  // Configure Whisper (voice transcription) — only for cloud providers
-  if (provider !== 'ollama') {
-    configureWhisper(provider, apiKey, AI_CONFIG.language || undefined);
-    console.log(`[Seren AI] Whisper configured: ${provider}`);
+  // Configure Whisper via Groq (optional — voice transcription)
+  if (GROQ_API_KEY) {
+    configureWhisper('groq', GROQ_API_KEY, LANGUAGE);
+    console.log('[Seren AI] Whisper configured: Groq');
   }
 }
 
 /**
- * Check if AI services have been configured with a valid key.
+ * Check if AI services have been configured.
  */
 export function isAIConfigured(): boolean {
-  return AI_CONFIG.apiKey.length > 0;
+  return OPENROUTER_API_KEY.length > 0;
 }
 
 /**
- * Get the current provider name (for display in UI).
+ * Get the current provider name (for internal logging).
  */
 export function getAIProvider(): string {
-  return AI_CONFIG.provider;
+  return 'openrouter';
 }

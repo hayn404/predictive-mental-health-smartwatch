@@ -12,10 +12,10 @@ export const Colors = {
   softBlueDark: '#4A71B5',
   softBlueMuted: '#EEF4FD',
 
-  violet: '#A288FC',             // Primary purple (buttons, waveform, stress line)
-  violetLight: '#C3B3FD',
-  violetDark: '#7054D6',
-  violetMuted: '#F2EEFF',
+  violet: '#3B2E66',             // Primary deep violet (matches Seren wordmark logo)
+  violetLight: '#6E5FA0',
+  violetDark: '#2A1F4D',
+  violetMuted: '#EAE5F5',
 
   // Background palette
   cream: '#f8fafa',              // App background (bright, clean white-gray)
@@ -39,7 +39,7 @@ export const Colors = {
 
   // Surface / Glass
   glass: 'rgba(255, 255, 255, 0.90)',
-  glassBorder: 'rgba(162, 136, 252, 0.12)',
+  glassBorder: 'rgba(59, 46, 102, 0.12)',
   glassDeep: 'rgba(255, 255, 255, 0.60)',
   overlay: 'rgba(31, 33, 45, 0.45)',
 
@@ -103,7 +103,7 @@ export const Shadow = {
     elevation: 4,
   },
   glow: {
-    shadowColor: '#A288FC',
+    shadowColor: '#3B2E66',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 24,

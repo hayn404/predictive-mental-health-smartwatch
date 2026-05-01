@@ -4,7 +4,7 @@
     "slug": "seren-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/images/seren-brain.png",
     "scheme": "serenapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -15,7 +15,7 @@
       "package": "com.seren.app",
       "minSdkVersion": 26,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo.png",
+        "foregroundImage": "./assets/images/seren-brain.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -36,7 +36,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/logo.png"
+      "favicon": "./assets/images/seren-brain.png"
     },
     "plugins": [
       "expo-router",
@@ -44,7 +44,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/logo.png",
+          "image": "./assets/images/seren-brain.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"

@@ -124,7 +124,8 @@ export function createHealthConnectService(): HealthConnectService {
     async requestPermissions() {
       try {
         const hc = await getHC();
-        // Only request record types supported by this version of react-native-health-connect
+        // Request permissions via the native popup.
+        // Requires MainActivity to call HealthConnectPermissionDelegate.setPermissionDelegate(this) in onCreate.
         const granted = await hc.requestPermission([
           { accessType: 'read', recordType: 'HeartRate' },
           { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
@@ -133,10 +134,17 @@ export function createHealthConnectService(): HealthConnectService {
           { accessType: 'read', recordType: 'OxygenSaturation' },
         ]);
         console.log('[Seren] Health Connect permissions result:', JSON.stringify(granted));
-        // requestPermission returns an array of granted permissions
         return Array.isArray(granted) && granted.length > 0;
       } catch (e) {
         console.error('[Seren] Health Connect permission request failed:', e);
+        // Fallback: open Health Connect settings so user can grant manually
+        try {
+          const hc = await getHC();
+          if (typeof (hc as any).openHealthConnectSettings === 'function') {
+            await (hc as any).openHealthConnectSettings();
+            return true;
+          }
+        } catch {}
         return false;
       }
     },

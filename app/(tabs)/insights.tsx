@@ -52,7 +52,7 @@ export default function InsightsScreen() {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.appIconContainer}>
-              <Image source={require('@/assets/images/logo.png')} style={styles.appIcon} />
+              <Image source={require('@/assets/images/seren-brain.png')} style={styles.appIcon} />
             </View>
             <Text style={styles.title}>Historical Trends</Text>
           </View>

@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow } from '@/constants/theme';
 import { useWellness } from '@/hooks/useWellness';
+import { useAuth } from '@/hooks/useAuth';
 import { StressGauge } from '@/components/ui/StressGauge';
 import { GlassCard } from '@/components/ui/GlassCard';
 
@@ -19,6 +20,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { stress, anxiety, lastSleep, heartRate, recommendations, sunlightExposure, locationDiversity } = useWellness();
+  const { user } = useAuth();
+  const displayName = user?.username || user?.email?.split('@')[0] || 'there';
 
   return (
     <View style={[styles.container, { backgroundColor: Colors.cream }]}>
@@ -34,9 +37,9 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.appIconContainer}>
-              <Image source={require('@/assets/images/logo.png')} style={styles.appIcon} />
+              <Image source={require('@/assets/images/seren-brain.png')} style={styles.appIcon} />
             </View>
-            <Text style={styles.nameText}>Hi, Alex</Text>
+            <Text style={styles.nameText}>Hi, {displayName}</Text>
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity hitSlop={10} style={{ marginRight: 12 }}>
@@ -103,7 +106,9 @@ export default function HomeScreen() {
             <View style={styles.metricContent}>
               <Text style={styles.metricLabel}>Anxiety Index</Text>
               <View style={styles.metricRow}>
-                <Text style={styles.metricValue}>{anxiety.level.charAt(0).toUpperCase() + anxiety.level.slice(1)}</Text>
+                <Text style={[styles.metricValue, { fontSize: 18 }]} numberOfLines={1} adjustsFontSizeToFit>
+                  {anxiety.level.charAt(0).toUpperCase() + anxiety.level.slice(1)}
+                </Text>
                 <Text style={styles.metricSubInfo}>{anxiety.sustained ? 'Sustained ↑' : 'Trend ↓'}</Text>
               </View>
             </View>
@@ -112,14 +117,14 @@ export default function HomeScreen() {
 
         {/* Sunlight Exposure Card */}
         <GlassCard variant="default" style={styles.sunlightCard}>
-          <View style={styles.sunlightLeft}>
+          <View style={[styles.sunlightLeft, { flex: 1 }]}>
             <View style={[styles.sunlightIconBg, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
               <MaterialIcons name="wb-sunny" size={24} color={Colors.warning} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.metricLabel}>Sunlight Exposure</Text>
-              <Text style={styles.metricSubInfo}>
-                {sunlightExposure?.isVitaminDWindow ? 'Vitamin D window open now!' : 'Daily Goal: 30 mins'}
+              <Text style={styles.metricSubInfo} numberOfLines={1}>
+                {sunlightExposure?.isVitaminDWindow ? 'Vitamin D window open!' : 'Daily Goal: 30 mins'}
               </Text>
               {/* Progress bar */}
               <View style={styles.progressBarBg}>
@@ -135,8 +140,8 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
-          <View style={{ alignItems: 'flex-end', minWidth: 50 }}>
-            <Text style={[styles.metricValue, { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary }]}>
+          <View style={styles.sunlightRight}>
+            <Text style={styles.sunlightValue}>
               {sunlightExposure ? `${sunlightExposure.totalOutdoorMinutes}m` : '—'}
             </Text>
             <Text style={styles.liveTextSmall}>Today</Text>
@@ -145,7 +150,7 @@ export default function HomeScreen() {
 
         {/* Location Diversity Card */}
         <GlassCard variant="default" style={styles.sunlightCard}>
-          <View style={styles.sunlightLeft}>
+          <View style={[styles.sunlightLeft, { flex: 1 }]}>
             <View style={[styles.sunlightIconBg, { backgroundColor: '#F3F0FF', borderColor: '#E8E0FF' }]}>
               <MaterialIcons name="place" size={24} color={Colors.violet} />
             </View>
@@ -161,8 +166,8 @@ export default function HomeScreen() {
               )}
             </View>
           </View>
-          <View style={{ alignItems: 'flex-end', minWidth: 50 }}>
-            <Text style={[styles.metricValue, { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary }]}>
+          <View style={styles.sunlightRight}>
+            <Text style={styles.sunlightValue}>
               {locationDiversity ? `${locationDiversity.diversityScore}` : '—'}
             </Text>
             <Text style={styles.liveTextSmall}>/100</Text>
@@ -489,6 +494,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+  },
+  sunlightRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    marginLeft: Spacing.sm,
+    minWidth: 60,
+  },
+  sunlightValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    lineHeight: 26,
   },
   progressBarBg: {
     height: 4,

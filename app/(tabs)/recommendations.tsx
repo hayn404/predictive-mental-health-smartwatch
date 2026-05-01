@@ -69,7 +69,7 @@ export default function RecommendationsScreen() {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.appIconContainer}>
-              <Image source={require('@/assets/images/logo.png')} style={styles.appIcon} />
+              <Image source={require('@/assets/images/seren-brain.png')} style={styles.appIcon} />
             </View>
             <Text style={styles.title}>For You</Text>
           </View>
@@ -151,40 +151,6 @@ export default function RecommendationsScreen() {
             <Text style={styles.toolIconLabel}>Meditation</Text>
           </TouchableOpacity>
         </View>
-
-        {/* MORNING RITUALS */}
-        <Text style={[styles.sectionLabelHeader, { marginTop: Spacing.xl, marginBottom: Spacing.md }]}>MORNING RITUALS</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ritualsScroll}>
-          <View style={styles.ritualItem}>
-            <View style={styles.ritualImageContainer}>
-              <Image source={{ uri: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400' }} style={styles.ritualImage} />
-              <View style={styles.ritualOverlay}>
-                <Text style={styles.ritualOverlayText}>Boost Circadian Rhythm</Text>
-              </View>
-            </View>
-            <Text style={styles.ritualTitle}>Sunlight Exposure</Text>
-          </View>
-
-          <View style={styles.ritualItem}>
-            <View style={styles.ritualImageContainer}>
-              <Image source={{ uri: 'https://images.unsplash.com/photo-1550596334-7bb40a71b6bc?q=80&w=400' }} style={styles.ritualImage} />
-              <View style={styles.ritualOverlay}>
-                <Text style={styles.ritualOverlayText}>Reset Nervous System</Text>
-              </View>
-            </View>
-            <Text style={styles.ritualTitle}>Cold Splash</Text>
-          </View>
-
-          <View style={styles.ritualItem}>
-            <View style={styles.ritualImageContainer}>
-              <Image source={{ uri: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=400' }} style={styles.ritualImage} />
-              <View style={styles.ritualOverlay}>
-                <Text style={styles.ritualOverlayText}>Positive Focus</Text>
-              </View>
-            </View>
-            <Text style={styles.ritualTitle}>Gratitude</Text>
-          </View>
-        </ScrollView>
 
         <View style={styles.divider} />
 

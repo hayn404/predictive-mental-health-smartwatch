@@ -35,7 +35,7 @@ export default function PrivacyScreen() {
                     <View style={styles.serenBadgeRow}>
                         <View style={styles.titleRow}>
                             <View style={styles.appIconContainer}>
-                                <Image source={require('@/assets/images/logo.png')} style={styles.appIcon} />
+                                <Image source={require('@/assets/images/seren-brain.png')} style={styles.appIcon} />
                             </View>
                             <Text style={styles.setupTitle}>Privacy & Permissions</Text>
                         </View>

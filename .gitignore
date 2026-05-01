@@ -50,3 +50,4 @@ wearos/app/build/
 wearos/.gradle/
 wearos/.idea/
 android/
+.env

@@ -36,8 +36,9 @@ export default function LoginScreen() {
     const result = await signInWithPassword(email.trim(), password);
     if (result.error) {
       setError(result.error);
+    } else if (result.user) {
+      router.replace('/onboarding/welcome' as any);
     }
-    // On success, the auth state change will trigger navigation automatically
   };
 
   const handleGoogleLogin = async () => {
@@ -45,6 +46,8 @@ export default function LoginScreen() {
     const result = await signInWithGoogle();
     if (result.error) {
       setError(result.error);
+    } else {
+      router.replace('/onboarding/welcome' as any);
     }
   };
 
@@ -64,7 +67,7 @@ export default function LoginScreen() {
         {/* Logo */}
         <View style={styles.logoSection}>
           <View style={styles.logoContainer}>
-            <Image source={require('@/assets/images/logo.png')} style={styles.logo} />
+            <Image source={require('@/assets/images/seren-brain.png')} style={styles.logo} />
           </View>
           <Text style={styles.appName}>Seren</Text>
           <Text style={styles.tagline}>Your mindful wellness companion</Text>

@@ -6,8 +6,9 @@ import {
     TouchableOpacity,
     ScrollView,
     Dimensions,
+    Image,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,25 +18,31 @@ const { width } = Dimensions.get('window');
 
 const slides = [
     {
-        image: require('@/assets/images/onboarding1.png'),
         title: 'Your Mental\nWellness Companion',
         subtitle: 'Seren monitors stress, sleep, and anxiety in real-time — gently, privately, and proactively.',
         badge: 'Powered by AI',
         badgeIcon: 'psychology',
+        heroIcon: 'psychology',
+        colors: ['#FFFFFF', '#EAE5F5'] as const,
+        accent: Colors.violet,
     },
     {
-        image: require('@/assets/images/onboarding2.png'),
         title: 'Seamlessly\nConnected',
         subtitle: 'Sync with your smartwatch to capture heart rate, HRV, and sleep data for deep mental health insights.',
         badge: 'Smartwatch Sync',
         badgeIcon: 'watch',
+        heroIcon: 'watch',
+        colors: ['#FFFFFF', '#E3ECFA'] as const,
+        accent: Colors.softBlue,
     },
     {
-        image: require('@/assets/images/onboarding3.png'),
         title: 'Your Data\nStays Yours',
         subtitle: 'All processing happens on your device. We never sell, share, or upload your mental health data.',
         badge: '100% Private',
         badgeIcon: 'shield',
+        heroIcon: 'verified-user',
+        colors: ['#FFFFFF', '#E3F5EA'] as const,
+        accent: Colors.sageGreen,
     },
 ];
 
@@ -45,6 +52,7 @@ export default function WelcomeScreen() {
     const [currentSlide, setCurrentSlide] = useState(0);
     const scrollRef = useRef<ScrollView>(null);
     const isLast = currentSlide === slides.length - 1;
+    const active = slides[currentSlide];
 
     const goNext = () => {
         if (currentSlide < slides.length - 1) {
@@ -58,13 +66,20 @@ export default function WelcomeScreen() {
 
     return (
         <View style={styles.container}>
+            <LinearGradient
+                colors={active.colors}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+            />
+
             <View style={[styles.header, { paddingTop: insets.top + Spacing.xl }]}>
                 <View style={styles.progressRow}>
-                    <Text style={styles.stepText}>STEP 1 OF 3</Text>
+                    <Text style={[styles.stepText, { color: active.accent }]}>STEP 1 OF 3</Text>
                     <Text style={styles.stepSubText}>Welcome</Text>
                 </View>
                 <View style={styles.progressBarBg}>
-                    <View style={[styles.progressBarFill, { width: '33%' }]} />
+                    <View style={[styles.progressBarFill, { width: '33%', backgroundColor: active.accent }]} />
                 </View>
             </View>
 
@@ -78,16 +93,22 @@ export default function WelcomeScreen() {
             >
                 {slides.map((slide, i) => (
                     <View key={i} style={[styles.slide, { width }]}>
-                        <Image
-                            source={slide.image}
-                            style={styles.slideImage}
-                            contentFit="cover"
-                            transition={400}
-                        />
-                        <View style={styles.slideOverlay} />
+                        <View style={styles.heroIconContainer}>
+                            <View style={[styles.heroIconCircle, { backgroundColor: slide.accent + '22', borderColor: slide.accent + '55' }]}>
+                                {i === 0 ? (
+                                    <Image
+                                        source={require('@/assets/images/seren-brain.png')}
+                                        style={styles.heroBrainImage}
+                                        resizeMode="contain"
+                                    />
+                                ) : (
+                                    <MaterialIcons name={slide.heroIcon as any} size={72} color={slide.accent} />
+                                )}
+                            </View>
+                        </View>
                         <View style={[styles.slideContent, { paddingBottom: insets.bottom + 180 }]}>
                             <View style={styles.badgeRow}>
-                                <MaterialIcons name={slide.badgeIcon as any} size={14} color={Colors.sageGreen} />
+                                <MaterialIcons name={slide.badgeIcon as any} size={14} color={slide.accent} />
                                 <Text style={styles.badge}>{slide.badge}</Text>
                             </View>
                             <Text style={styles.slideTitle}>{slide.title}</Text>
@@ -105,13 +126,18 @@ export default function WelcomeScreen() {
                             key={i}
                             style={[
                                 styles.dot,
-                                i === currentSlide ? styles.dotActive : styles.dotInactive,
+                                i === currentSlide
+                                    ? { ...styles.dotActive, backgroundColor: active.accent }
+                                    : styles.dotInactive,
                             ]}
                         />
                     ))}
                 </View>
 
-                <TouchableOpacity style={styles.nextButton} onPress={goNext}>
+                <TouchableOpacity
+                    style={[styles.nextButton, { backgroundColor: active.accent }]}
+                    onPress={goNext}
+                >
                     <Text style={styles.nextText}>{isLast ? 'Continue Setup' : 'Continue'}</Text>
                     <MaterialIcons name="arrow-forward" size={18} color={Colors.warmWhite} />
                 </TouchableOpacity>
@@ -129,7 +155,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#252240',
+        backgroundColor: Colors.cream,
     },
     header: {
         marginBottom: Spacing.xl,
@@ -147,36 +173,44 @@ const styles = StyleSheet.create({
     },
     stepText: {
         fontSize: FontSize.xs,
-        color: Colors.violet,
         fontWeight: '700',
         letterSpacing: 1.2,
     },
     stepSubText: {
         fontSize: FontSize.xs,
-        color: Colors.warmWhite,
+        color: Colors.textSecondary,
         fontWeight: '500',
     },
     progressBarBg: {
         height: 4,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: 'rgba(0,0,0,0.08)',
         borderRadius: Radius.full,
         marginBottom: Spacing.xl,
     },
     progressBarFill: {
         height: 4,
-        backgroundColor: Colors.violet,
         borderRadius: Radius.full,
     },
     slide: {
         flex: 1,
         position: 'relative',
     },
-    slideImage: {
-        ...StyleSheet.absoluteFillObject,
+    heroIconContainer: {
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        paddingTop: 140,
     },
-    slideOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(37, 34, 64, 0.30)',
+    heroIconCircle: {
+        width: 180,
+        height: 180,
+        borderRadius: 90,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+    },
+    heroBrainImage: {
+        width: 120,
+        height: 120,
     },
     slideContent: {
         position: 'absolute',
@@ -189,30 +223,30 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: 'rgba(255,255,255,0.7)',
         alignSelf: 'flex-start',
         paddingHorizontal: Spacing.md,
         paddingVertical: 6,
         borderRadius: Radius.full,
         marginBottom: Spacing.md,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.3)',
+        borderColor: 'rgba(0,0,0,0.08)',
     },
     badge: {
         fontSize: FontSize.xs,
-        color: Colors.warmWhite,
+        color: Colors.textPrimary,
         fontWeight: FontWeight.semibold,
     },
     slideTitle: {
         fontSize: FontSize.xxl,
         fontWeight: FontWeight.bold,
-        color: Colors.warmWhite,
+        color: Colors.textPrimary,
         lineHeight: 38,
         marginBottom: Spacing.md,
     },
     slideSubtitle: {
         fontSize: FontSize.md,
-        color: 'rgba(255,255,255,0.85)',
+        color: Colors.textSecondary,
         lineHeight: 26,
         fontWeight: FontWeight.regular,
     },
@@ -236,18 +270,16 @@ const styles = StyleSheet.create({
     },
     dotActive: {
         width: 28,
-        backgroundColor: Colors.sageGreen,
     },
     dotInactive: {
         width: 8,
-        backgroundColor: 'rgba(255,255,255,0.4)',
+        backgroundColor: 'rgba(0,0,0,0.15)',
     },
     nextButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        backgroundColor: Colors.violet,
         paddingVertical: Spacing.md,
         paddingHorizontal: Spacing.xl,
         borderRadius: Radius.full,
@@ -263,11 +295,11 @@ const styles = StyleSheet.create({
     },
     skipText: {
         fontSize: FontSize.sm,
-        color: 'rgba(255,255,255,0.7)',
+        color: Colors.textMuted,
         fontWeight: FontWeight.medium,
     },
     skipBtnPlaceholder: {
         paddingVertical: 8,
-        height: 36, // To keep the layout stable when the button disappears
+        height: 36,
     },
 });

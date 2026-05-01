@@ -25,7 +25,7 @@ import {
 // ============================================================
 
 export interface LLMConfig {
-  provider: 'openai' | 'groq' | 'ollama' | 'custom';
+  provider: 'openai' | 'groq' | 'ollama' | 'openrouter' | 'custom';
   apiKey: string;
   baseUrl: string;
   model: string;
@@ -52,6 +52,13 @@ const DEFAULT_CONFIGS: Record<string, Omit<LLMConfig, 'apiKey'>> = {
     provider: 'ollama',
     baseUrl: 'http://localhost:11434/v1',
     model: 'llama3.1',
+    maxTokens: 512,
+    temperature: 0.7,
+  },
+  openrouter: {
+    provider: 'openrouter',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'meta-llama/llama-3.1-8b-instruct:free',
     maxTokens: 512,
     temperature: 0.7,
   },
@@ -126,7 +133,7 @@ export function configureLLM(config: LLMConfig): void {
  * Configure using a preset provider.
  */
 export function configureLLMPreset(
-  provider: 'openai' | 'groq' | 'ollama',
+  provider: 'openai' | 'groq' | 'ollama' | 'openrouter',
   apiKey: string = '',
 ): void {
   const preset = DEFAULT_CONFIGS[provider];
@@ -221,9 +228,15 @@ async function callLLMAPI(userMessage: string): Promise<string> {
     'Content-Type': 'application/json',
   };
 
-  // Ollama doesn't need auth; OpenAI/Groq use Bearer token
+  // Ollama doesn't need auth; OpenAI/Groq/OpenRouter use Bearer token
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+
+  // OpenRouter recommends these headers for app attribution
+  if (currentConfig.provider === 'openrouter') {
+    headers['HTTP-Referer'] = 'https://seren-app.com';
+    headers['X-Title'] = 'Seren';
   }
 
   const body = {
