@@ -1,0 +1,111 @@
+{
+  "model": "XGBoost",
+  "version": "2.0.0",
+  "created": "2026-05-03T19:07:22.859332",
+  "dataset": "DEPRESJON \u2014 Simula Research Laboratory, Norway",
+  "dataset_doi": "https://doi.org/10.5281/zenodo.1219550",
+  "citation": "Garcia-Ceja et al. (2018). Depresjon. ACM MMSys.",
+  "n_subjects": 55,
+  "n_features": 26,
+  "feature_names": [
+    "act_mean",
+    "act_std",
+    "act_median",
+    "act_p10",
+    "act_p25",
+    "act_p75",
+    "act_p90",
+    "act_iqr",
+    "act_skew",
+    "act_kurt",
+    "act_coeff_var",
+    "total_activity",
+    "n_days",
+    "circadian_day_night_ratio",
+    "circadian_amplitude",
+    "peak_activity_hour",
+    "circadian_stability",
+    "autocorr_lag1",
+    "autocorr_lag60",
+    "autocorr_lag1440",
+    "psd_mean",
+    "psd_peak_freq",
+    "spectral_entropy",
+    "n_active_switches",
+    "avg_active_bout_len",
+    "active_fraction"
+  ],
+  "cv_performance": {
+    "Random Forest": {
+      "auc_mean": 0.821,
+      "auc_std": 0.1146,
+      "acc_mean": 0.7455,
+      "f1_mean": 0.64
+    },
+    "XGBoost": {
+      "auc_mean": 0.8624,
+      "auc_std": 0.1062,
+      "acc_mean": 0.7636,
+      "f1_mean": 0.6899
+    },
+    "SVM (RBF)": {
+      "auc_mean": 0.8062,
+      "auc_std": 0.082,
+      "acc_mean": 0.7455,
+      "f1_mean": 0.6521
+    },
+    "Logistic Regression": {
+      "auc_mean": 0.811,
+      "auc_std": 0.1388,
+      "acc_mean": 0.7091,
+      "f1_mean": 0.6122
+    }
+  },
+  "test_performance": {
+    "Random Forest": {
+      "acc": 0.8182,
+      "auc": 0.9,
+      "f1": 0.75
+    },
+    "XGBoost": {
+      "acc": 0.9091,
+      "auc": 0.9667,
+      "f1": 0.8889
+    },
+    "SVM (RBF)": {
+      "acc": 0.8182,
+      "auc": 0.9333,
+      "f1": 0.75
+    },
+    "Logistic Regression": {
+      "acc": 0.8182,
+      "auc": 0.9333,
+      "f1": 0.8
+    }
+  },
+  "best_model": "XGBoost",
+  "risk_thresholds": {
+    "None/Minimal": [
+      0.0,
+      0.25
+    ],
+    "Mild": [
+      0.25,
+      0.45
+    ],
+    "Moderate": [
+      0.45,
+      0.7
+    ],
+    "Severe": [
+      0.7,
+      1.0
+    ]
+  },
+  "samsung_sdk_mapping": {
+    "activity_counts": "Samsung Health Sensor SDK \u2014 Accelerometer (1-min aggregated)",
+    "data_transfer": "Wearable Data Layer API (MessageClient)",
+    "on_device_format": "Export to TFLite via ONNX for Android deployment"
+  },
+  "disclaimer": "R&D research only. Not a medical device. Samsung Watch sensors certified for wellness, not clinical diagnosis."
+}
