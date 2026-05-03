@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ProgressBarAndroid, ProgressViewIOS, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -92,7 +92,7 @@ export default function Gad7Screen() {
                         </Text>
 
                         <GlassCard variant="default" style={styles.questionCard}>
-                            <Text style={styles.questionText}>"{QUESTIONS[currentStep]}"</Text>
+                            <Text style={styles.questionText}>&quot;{QUESTIONS[currentStep]}&quot;</Text>
                         </GlassCard>
 
                         <View style={styles.optionsContainer}>
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     questionText: {
         fontSize: FontSize.lg,
         fontWeight: FontWeight.semibold,
-        color: Colors.warningDark,
+        color: '#B45309',
         textAlign: 'center',
         lineHeight: 28,
     },
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
         color: Colors.textSecondary,
     },
     optionTextSelected: {
-        color: Colors.warningDark,
+        color: '#B45309',
         fontWeight: FontWeight.bold,
     },
     resultContainer: {
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.lg,
     },
     doneBtn: {
-        backgroundColor: Colors.warningText,
+        backgroundColor: Colors.warning,
         width: '100%',
         paddingVertical: Spacing.lg,
         borderRadius: Radius.full,

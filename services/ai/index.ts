@@ -16,8 +16,11 @@ export { createHealthConnectService, createMockHealthConnectService } from './he
 // Feature engineering (on-device)
 export { extractFeatures } from './featureEngineering';
 
-// Stress & anxiety prediction
-export { loadModel, loadModelFromString, isModelLoaded, predictStress, predictAnxiety } from './stressModel';
+// Stress prediction
+export { loadModel, loadModelFromString, isModelLoaded, predictStress } from './stressModel';
+
+// Anxiety prediction
+export { loadAnxietyModel, loadAnxietyModelFromString, isAnxietyModelLoaded, predictAnxiety } from './anxietyModel';
 
 // Personal baseline
 export { computeBaseline, shouldRecomputeBaseline, detectAnomalies } from './baseline';

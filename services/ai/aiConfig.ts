@@ -3,8 +3,8 @@
  * ===================================
  * API keys are loaded from environment variables (never committed to source).
  * Configure them in your .env file:
- *   EXPO_PUBLIC_OPENROUTER_API_KEY=sk-or-v1-...
- *   EXPO_PUBLIC_GROQ_API_KEY=gsk_...  (optional, for voice transcription)
+ *   EXPO_PUBLIC_GROQ_API_KEY=gsk_...  (for focus tips & voice transcription)
+ *   EXPO_PUBLIC_OPENROUTER_API_KEY=sk-or-v1-... (optional, for emotional analysis)
  */
 
 import { configureLLMPreset } from './llmService';
@@ -14,8 +14,8 @@ import { configureWhisper } from './whisperService';
 // Internal configuration — API keys from env vars (secrets)
 // ============================================================
 
-const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '';
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || '';
+const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '';
 
 const LANGUAGE = 'en';
 
@@ -34,12 +34,15 @@ export function initializeAIServices(): void {
   if (_initialized) return;
   _initialized = true;
 
-  // Configure LLM with OpenRouter (emotional analysis)
-  if (OPENROUTER_API_KEY) {
+  // Configure LLM with Groq (focus tips & emotional analysis)
+  if (GROQ_API_KEY) {
+    configureLLMPreset('groq', GROQ_API_KEY);
+    console.log('[Seren AI] LLM configured: Groq');
+  } else if (OPENROUTER_API_KEY) {
     configureLLMPreset('openrouter', OPENROUTER_API_KEY);
     console.log('[Seren AI] LLM configured: OpenRouter');
   } else {
-    console.log('[Seren AI] OpenRouter key not set — using local fallback analysis.');
+    console.log('[Seren AI] No LLM key set — using local fallback analysis.');
   }
 
   // Configure Whisper via Groq (optional — voice transcription)
@@ -53,12 +56,14 @@ export function initializeAIServices(): void {
  * Check if AI services have been configured.
  */
 export function isAIConfigured(): boolean {
-  return OPENROUTER_API_KEY.length > 0;
+  return GROQ_API_KEY.length > 0 || OPENROUTER_API_KEY.length > 0;
 }
 
 /**
  * Get the current provider name (for internal logging).
  */
 export function getAIProvider(): string {
-  return 'openrouter';
+  if (GROQ_API_KEY) return 'groq';
+  if (OPENROUTER_API_KEY) return 'openrouter';
+  return 'none';
 }

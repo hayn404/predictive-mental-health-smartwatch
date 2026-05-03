@@ -68,7 +68,7 @@ export default function SyncScreen() {
                     </View>
 
                     <Text style={styles.heading}>Sync your smartwatch.</Text>
-                    <Text style={styles.subtitle}>Seren uses your watch's sensors to proactively measure stress and sleep.</Text>
+                    <Text style={styles.subtitle}>Seren uses your watch&apos;s sensors to proactively measure stress and sleep.</Text>
                 </View>
 
                 <View style={styles.syncContainer}>

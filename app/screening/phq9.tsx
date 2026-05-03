@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ProgressBarAndroid, ProgressViewIOS, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -95,7 +95,7 @@ export default function Phq9Screen() {
                         </Text>
 
                         <GlassCard variant="default" style={styles.questionCard}>
-                            <Text style={styles.questionText}>"{QUESTIONS[currentStep]}"</Text>
+                            <Text style={styles.questionText}>&quot;{QUESTIONS[currentStep]}&quot;</Text>
                         </GlassCard>
 
                         <View style={styles.optionsContainer}>

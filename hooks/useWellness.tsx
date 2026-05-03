@@ -33,6 +33,7 @@ import * as SQLite from 'expo-sqlite';
 import {
   StressPrediction,
   AnxietyPrediction,
+  FocusPrediction,
   SleepAnalysis,
   PersonalBaseline,
   Recommendation,
@@ -45,8 +46,16 @@ import {
 import {
   loadModel,
   predictStress,
-  predictAnxiety,
 } from '@/services/ai/stressModel';
+import {
+  loadAnxietyModel,
+  predictAnxiety,
+} from '@/services/ai/anxietyModel';
+import {
+  loadFocusModel,
+  predictFocus,
+} from '@/services/ai/focusModel';
+import { getFocusTips } from '@/services/ai/focusRecommendations';
 import { extractFeatures } from '@/services/ai/featureEngineering';
 import { computeBaseline, shouldRecomputeBaseline, detectAnomalies, AnomalyFlag } from '@/services/ai/baseline';
 import { analyzeSleepSession, computeSleepTrend, SleepTrend } from '@/services/ai/sleepAnalysis';
@@ -111,6 +120,7 @@ interface WellnessContextValue {
   // Current state
   stress: StressPrediction;
   anxiety: AnxietyPrediction;
+  focus: FocusPrediction;
   lastSleep: SleepAnalysis | null;
   sleepTrend: SleepTrend;
   baseline: PersonalBaseline | null;
@@ -188,6 +198,15 @@ const DEFAULT_ANXIETY: AnxietyPrediction = {
   baselineDeviation: 0,
 };
 
+const DEFAULT_FOCUS: FocusPrediction = {
+  timestamp: Date.now(),
+  focusScore: 65,
+  focusLevel: 'steady',
+  elevatedFeatures: [],
+  groqTips: [],
+  groqLoading: false,
+};
+
 const DEFAULT_SLEEP_TREND: SleepTrend = { avgQuality: 0, avgDuration: 0, trend: 'stable', daysAnalyzed: 0 };
 const DEFAULT_CHECKIN_TREND: CheckinTrend = { avgSentiment: 0, dominantEmotion: 'calm', trend: 'stable', count: 0 };
 
@@ -211,6 +230,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   // Core state
   const [stress, setStress] = useState<StressPrediction>(DEFAULT_STRESS);
   const [anxiety, setAnxiety] = useState<AnxietyPrediction>(DEFAULT_ANXIETY);
+  const [focus, setFocus] = useState<FocusPrediction>(DEFAULT_FOCUS);
   const [lastSleep, setLastSleep] = useState<SleepAnalysis | null>(null);
   const [sleepTrend, setSleepTrend] = useState<SleepTrend>(DEFAULT_SLEEP_TREND);
   const [baseline, setBaseline] = useState<PersonalBaseline | null>(null);
@@ -253,6 +273,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const featureHistory = useRef<BiometricFeatureVector[]>([]);
   const sleepHistory = useRef<SleepAnalysis[]>([]);
   const dbReadyRef = useRef(false);
+  const lastFocusScoreRef = useRef(0);
 
   // ============================================================
   // Initialization
@@ -267,7 +288,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     initializeAIServices();
 
     await Promise.all([
-      loadStressModel(),
+      loadModels(),
       initDb(),
       initHealthConnect(),
       initNotifications(),
@@ -276,14 +297,18 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     initLocationAndSunlight();
   }
 
-  async function loadStressModel() {
+  async function loadModels() {
     try {
       // Import JSON directly — Metro bundler handles JSON requires natively
-      const modelJson = require('@/assets/ml/stress_model.json');
-      loadModel(modelJson);
+      const stressModelJson = require('@/assets/ml/stress_model.json');
+      const anxietyModelJson = require('@/assets/ml/anxiety_model.json');
+      const focusModelJson = require('@/assets/ml/focus_model.json');
+      loadModel(stressModelJson);
+      loadAnxietyModel(anxietyModelJson);
+      loadFocusModel(focusModelJson);
       setModelLoaded(true);
     } catch (e) {
-      console.warn('[Seren] Failed to load stress model:', e);
+      console.warn('[Seren] Failed to load ML models:', e);
     }
   }
 
@@ -508,7 +533,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
     const sleepPerDay: Record<string, number> = {};
     sleepHistory.current.forEach(sa => {
-      const d = new Date(sa.startTime);
+      const d = new Date(sa.sessionStart);
       const diff = Math.floor((now.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
       if (diff >= 0 && diff < 7) {
         const idx = (d.getDay() + 6) % 7;
@@ -552,7 +577,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         const row = Math.floor(day / 7);
         const target = now - day * 24 * 60 * 60 * 1000;
         const match = sleepHistory.current.find(s => {
-          const diff = Math.abs(s.startTime - target);
+          const diff = Math.abs(s.sessionStart - target);
           return diff < 24 * 60 * 60 * 1000;
         });
         grid[row].push(match ? Math.round(match.qualityScore) : 0);
@@ -627,9 +652,32 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       const stressPred = predictStress(featureVector, baseline);
       setStress(stressPred);
 
-      const lastSleepQuality = lastSleep?.qualityScore ?? null;
-      const anxietyPred = predictAnxiety(stressPred, featureVector, baseline, lastSleepQuality);
+      const anxietyPred = predictAnxiety(featureVector, baseline);
       setAnxiety(anxietyPred);
+
+      const focusPred = predictFocus(featureVector);
+      setFocus({ ...focusPred, groqLoading: false });
+
+      // Only trigger Groq if focus score changed by 7+ points (significant change)
+      const scoreDiff = Math.abs(focusPred.focusScore - lastFocusScoreRef.current);
+      if (scoreDiff >= 7) {
+        console.log(`[Seren] Focus score changed ${scoreDiff.toFixed(0)} points (${lastFocusScoreRef.current} → ${focusPred.focusScore}) - Triggering Groq`);
+        lastFocusScoreRef.current = focusPred.focusScore;
+        setFocus(prev => ({ ...prev, groqLoading: true }));
+
+        getFocusTips(focusPred.focusScore, focusPred.focusLevel, focusPred.elevatedFeatures, false)
+          .then(tips => {
+            console.log(`[Seren] Groq tips received: ${tips.length} tips`);
+            setFocus(prev => ({ ...prev, groqTips: tips, groqLoading: false }));
+          })
+          .catch(err => {
+            console.warn(`[Seren] Groq failed: ${err}`);
+            setFocus(prev => ({ ...prev, groqLoading: false }));
+          });
+      } else {
+        console.log(`[Seren] Focus score change too small (${scoreDiff.toFixed(1)}/7) - No Groq generation`);
+        setFocus(prev => ({ ...prev, groqTips: [], groqLoading: false }));
+      }
 
       if (baseline) {
         const flags = detectAnomalies(featureVector, baseline);
@@ -764,6 +812,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     setLastSleep(null);
     setStress(DEFAULT_STRESS);
     setAnxiety(DEFAULT_ANXIETY);
+    setFocus(DEFAULT_FOCUS);
     setRecommendations([]);
     setAnomalies([]);
     setSleepTrend(DEFAULT_SLEEP_TREND);
@@ -804,7 +853,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   // ============================================================
 
   const value: WellnessContextValue = {
-    stress, anxiety, lastSleep, sleepTrend, baseline, anomalies,
+    stress, anxiety, focus, lastSleep, sleepTrend, baseline, anomalies,
     recommendations, features, heartRate, hrv,
     locationDiversity, sunlightExposure,
     lastCheckin, checkinHistory, checkinTrend, performCheckin,

@@ -157,7 +157,14 @@ export const getCheckinHistory = (): CheckinEntry[] => [
 
 export const getStressLabel = (level: number): { label: string; color: string; description: string } => {
   if (level <= 25) return { label: 'Low', color: '#35e27e', description: 'You\'re in a calm, relaxed state.' };
-  if (level <= 50) return { label: 'Moderate', color: '#9B8EC4', description: 'Some tension present. Monitor and breathe.' };
-  if (level <= 75) return { label: 'Elevated', color: '#E8A87C', description: 'Stress is building. Consider a break.' };
-  return { label: 'High', color: '#C4897B', description: 'High stress detected. Please take action.' };
+  if (level <= 50) return { label: 'Moderate', color: '#2DBD6A', description: 'Some tension present. Monitor and breathe.' };
+  if (level <= 75) return { label: 'Elevated', color: '#1F9952', description: 'Stress is building. Consider a break.' };
+  return { label: 'High', color: '#157A3E', description: 'High stress detected. Please take action.' };
+};
+
+export const getAnxietyColor = (level: number): { label: string; color: string; description: string } => {
+  if (level <= 25) return { label: 'Minimal', color: '#7AC59E', description: 'Anxiety is low. You\'re feeling calm.' };
+  if (level <= 50) return { label: 'Mild', color: '#A3A6D4', description: 'Mild anxiety present. Consider grounding.' };
+  if (level <= 75) return { label: 'Moderate', color: '#837AB5', description: 'Moderate anxiety. Take a breathing break.' };
+  return { label: 'Severe', color: '#5B4A82', description: 'Elevated anxiety detected. Try a breathing exercise.' };
 };

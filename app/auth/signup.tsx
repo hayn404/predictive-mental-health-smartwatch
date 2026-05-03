@@ -45,7 +45,7 @@ export default function SignUpScreen() {
     }
 
     setError('');
-    const result = await signUpWithPassword(email.trim(), password, username.trim());
+    const result = await signUpWithPassword(email.trim(), password, { username: username.trim() });
 
     if (result.error) {
       setError(result.error);

@@ -159,7 +159,7 @@ export default function RecommendationsScreen() {
           <MaterialIcons name="help-outline" size={20} color={Colors.textSecondary} style={{ marginTop: 2, marginLeft: 4 }} />
           <View style={styles.supportTextCol}>
             <Text style={styles.supportTitle}>Need immediate support?</Text>
-            <Text style={styles.supportDesc}>Resources for when you're overwhelmed.</Text>
+            <Text style={styles.supportDesc}>Resources for when you&apos;re overwhelmed.</Text>
           </View>
           <TouchableOpacity style={styles.supportBtn} onPress={handleGetHelp}>
             <Text style={styles.supportBtnText}>Get Help Now</Text>

@@ -71,43 +71,44 @@ export async function notifyAnomalies(anomalies: AnomalyFlag[]): Promise<void> {
   if (!permissionGranted) return;
 
   for (const anomaly of anomalies) {
-    const type = `anomaly_${anomaly.metric}`;
-    if (!shouldNotify(type)) continue;
+    const notifType = `anomaly_${anomaly.type}`;
+    if (!shouldNotify(notifType)) continue;
 
     const { title, body } = anomalyToNotification(anomaly);
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
         body,
-        data: { type: 'anomaly', metric: anomaly.metric },
+        data: { type: 'anomaly', anomalyType: anomaly.type },
         categoryIdentifier: 'wellness_alert',
       },
-      trigger: null, // Immediately
+      trigger: null,
     });
   }
 }
 
 function anomalyToNotification(anomaly: AnomalyFlag): { title: string; body: string } {
-  switch (anomaly.metric) {
-    case 'rmssd':
+  const zLabel = anomaly.zScore !== undefined ? ` (${Math.abs(anomaly.zScore).toFixed(1)}σ from baseline)` : '';
+  switch (anomaly.type) {
+    case 'hrv_low':
       return {
         title: 'Low HRV Detected',
-        body: `Your HRV dropped to ${Math.round(anomaly.currentValue)}ms (${anomaly.deviations.toFixed(1)} std below baseline). Consider a breathing exercise.`,
+        body: `${anomaly.message}${zLabel}. Consider a breathing exercise.`,
       };
-    case 'hrMean':
+    case 'hr_elevated':
       return {
-        title: anomaly.direction === 'high' ? 'Elevated Heart Rate' : 'Low Heart Rate',
-        body: `Heart rate is ${Math.round(anomaly.currentValue)} BPM, ${Math.abs(anomaly.deviations).toFixed(1)} std ${anomaly.direction === 'high' ? 'above' : 'below'} your baseline.`,
+        title: 'Elevated Heart Rate',
+        body: `${anomaly.message}${zLabel}.`,
       };
-    case 'tempMean':
+    case 'temp_drop':
       return {
         title: 'Unusual Temperature',
-        body: `Wrist temperature is ${anomaly.currentValue.toFixed(1)}°C, which is unusual for you.`,
+        body: `${anomaly.message}${zLabel}.`,
       };
     default:
       return {
         title: 'Wellness Alert',
-        body: `An unusual pattern was detected in your ${anomaly.metric} readings.`,
+        body: anomaly.message,
       };
   }
 }

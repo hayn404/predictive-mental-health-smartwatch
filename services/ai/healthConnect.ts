@@ -334,13 +334,18 @@ function mapHealthConnectSleepStage(stage: number): RawSleepSession['stages'][0]
 // ============================================================
 
 export function createMockHealthConnectService(): HealthConnectService {
+  // Simulate exam stress conditions
+  const isExamTime = true; // Mock data simulates someone in an exam
+
   const generateHRSamples = (start: number, end: number): RawHeartRateSample[] => {
     const samples: RawHeartRateSample[] = [];
     const interval = 5000; // Every 5 seconds
     for (let t = start; t < end; t += interval) {
+      // Exam stress: HR 90-110 BPM | Normal: 65-85 BPM
+      const bpm = isExamTime ? 95 + Math.random() * 20 : 65 + Math.random() * 20;
       samples.push({
         timestamp: t,
-        bpm: 65 + Math.random() * 20, // 65-85 BPM
+        bpm,
         source: 'mock.samsung.health',
       });
     }
@@ -351,9 +356,11 @@ export function createMockHealthConnectService(): HealthConnectService {
     const samples: RawHRVSample[] = [];
     const interval = 300000; // Every 5 minutes
     for (let t = start; t < end; t += interval) {
+      // Exam stress: HRV 15-35 ms (low) | Normal: 35-75 ms
+      const rmssd = isExamTime ? 20 + Math.random() * 20 : 35 + Math.random() * 40;
       samples.push({
         timestamp: t,
-        rmssd: 35 + Math.random() * 40, // 35-75 ms
+        rmssd,
       });
     }
     return samples;
@@ -391,7 +398,9 @@ export function createMockHealthConnectService(): HealthConnectService {
     async readTemperature(start, end) {
       const samples: RawTemperatureSample[] = [];
       for (let t = start; t < end; t += 60000) {
-        samples.push({ timestamp: t, temperatureCelsius: 33 + Math.random() * 2 });
+        // Exam stress: 34-36°C | Normal: 33-35°C
+        const temp = isExamTime ? 34.5 + Math.random() * 1.5 : 33 + Math.random() * 2;
+        samples.push({ timestamp: t, temperatureCelsius: temp });
       }
       return samples;
     },
@@ -399,7 +408,9 @@ export function createMockHealthConnectService(): HealthConnectService {
       return [{ timestamp: (start + end) / 2, percentage: 96 + Math.random() * 3 }];
     },
     async readRespiratoryRate(start, end) {
-      return [{ timestamp: (start + end) / 2, breathsPerMinute: 14 + Math.random() * 4 }];
+      // Exam stress: 20-24 breaths/min | Normal: 14-18
+      const rr = isExamTime ? 22 + Math.random() * 4 : 14 + Math.random() * 4;
+      return [{ timestamp: (start + end) / 2, breathsPerMinute: rr }];
     },
   };
 }

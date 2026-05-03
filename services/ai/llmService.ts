@@ -156,6 +156,14 @@ export function getLLMConfig(): Omit<LLMConfig, 'apiKey'> | null {
   return rest;
 }
 
+/**
+ * Get the API key only (for internal services like focus recommendations).
+ * Should not be exposed to UI components.
+ */
+export function getLLMApiKey(): string {
+  return currentConfig?.apiKey ?? '';
+}
+
 /** Full biometric snapshot passed to the LLM for deep cross-referencing */
 export interface FullBiometricContext {
   hr: number;

@@ -10,12 +10,11 @@ import {
   loadModelFromString,
   isModelLoaded,
   predictStress,
-  predictAnxiety,
 } from '@/services/ai/stressModel';
+import { predictAnxiety } from '@/services/ai/anxietyModel';
 import type {
   BiometricFeatureVector,
   PersonalBaseline,
-  StressPrediction,
 } from '@/services/ai/types';
 
 // ============================================================
@@ -219,70 +218,40 @@ describe('predictAnxiety', () => {
   });
 
   test('returns anxiety index between 0 and 100', () => {
-    const stress: StressPrediction = {
-      timestamp: Date.now(),
-      stressScore: 50,
-      stressLevel: 'moderate',
-      confidence: 0.8,
-      topContributors: [],
-    };
-    const result = predictAnxiety(stress, makeFeatureVector(), null, null);
+    const result = predictAnxiety(makeFeatureVector());
     expect(result.anxietyIndex).toBeGreaterThanOrEqual(0);
     expect(result.anxietyIndex).toBeLessThanOrEqual(100);
   });
 
   test('returns correct anxiety level categories', () => {
-    const stress: StressPrediction = {
-      timestamp: Date.now(),
-      stressScore: 50,
-      stressLevel: 'moderate',
-      confidence: 0.8,
-      topContributors: [],
-    };
-    const result = predictAnxiety(stress, makeFeatureVector(), null, null);
+    const result = predictAnxiety(makeFeatureVector());
     const validLevels = ['minimal', 'mild', 'moderate', 'severe'];
     expect(validLevels).toContain(result.level);
   });
 
-  test('poor sleep quality increases anxiety', () => {
-    const stress: StressPrediction = {
-      timestamp: Date.now(), stressScore: 50,
-      stressLevel: 'moderate', confidence: 0.8, topContributors: [],
-    };
-    const features = makeFeatureVector();
-    const goodSleep = predictAnxiety(stress, features, null, 85);
-    const poorSleep = predictAnxiety(stress, features, null, 30);
-    expect(poorSleep.anxietyIndex).toBeGreaterThan(goodSleep.anxietyIndex);
+  test('low HRV features produce valid anxiety output', () => {
+    const features = makeFeatureVector({ rmssd: 15, lfHfRatio: 4.0 });
+    const result = predictAnxiety(features);
+    expect(result.anxietyIndex).toBeGreaterThanOrEqual(0);
+    expect(result.anxietyIndex).toBeLessThanOrEqual(100);
   });
 
   test('high LF/HF ratio increases anxiety', () => {
-    const stress: StressPrediction = {
-      timestamp: Date.now(), stressScore: 50,
-      stressLevel: 'moderate', confidence: 0.8, topContributors: [],
-    };
-    const lowRatio = predictAnxiety(stress, makeFeatureVector({ lfHfRatio: 1.0 }), null, null);
-    const highRatio = predictAnxiety(stress, makeFeatureVector({ lfHfRatio: 5.0 }), null, null);
+    const lowRatio = predictAnxiety(makeFeatureVector({ lfHfRatio: 1.0 }));
+    const highRatio = predictAnxiety(makeFeatureVector({ lfHfRatio: 5.0 }));
     expect(highRatio.anxietyIndex).toBeGreaterThan(lowRatio.anxietyIndex);
   });
 
   test('HRV below baseline increases anxiety', () => {
-    const stress: StressPrediction = {
-      timestamp: Date.now(), stressScore: 50,
-      stressLevel: 'moderate', confidence: 0.8, topContributors: [],
-    };
     const baseline = makeBaseline({ rmssdMean: 45, rmssdStd: 10 });
-    const normalHRV = predictAnxiety(stress, makeFeatureVector({ rmssd: 45 }), baseline, null);
-    const lowHRV = predictAnxiety(stress, makeFeatureVector({ rmssd: 15 }), baseline, null);
+    const normalHRV = predictAnxiety(makeFeatureVector({ rmssd: 45 }), baseline);
+    const lowHRV = predictAnxiety(makeFeatureVector({ rmssd: 15 }), baseline);
     expect(lowHRV.anxietyIndex).toBeGreaterThan(normalHRV.anxietyIndex);
   });
 
   test('baselineDeviation is clamped between -1 and 1', () => {
-    const stress: StressPrediction = {
-      timestamp: Date.now(), stressScore: 50,
-      stressLevel: 'moderate', confidence: 0.8, topContributors: [],
-    };
     const baseline = makeBaseline();
-    const result = predictAnxiety(stress, makeFeatureVector({ rmssd: 5 }), baseline, null);
+    const result = predictAnxiety(makeFeatureVector({ rmssd: 5 }), baseline);
     expect(result.baselineDeviation).toBeGreaterThanOrEqual(-1);
     expect(result.baselineDeviation).toBeLessThanOrEqual(1);
   });

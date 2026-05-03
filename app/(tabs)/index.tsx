@@ -59,7 +59,7 @@ export default function HomeScreen() {
           </Text>
           <Text style={styles.greetingSub}>
             {stress.stressLevel === 'low'
-              ? `You're doing well. Heart rate is ${heartRate} BPM.`
+              ? `You&apos;re doing well. Heart rate is ${heartRate} BPM.`
               : stress.stressLevel === 'moderate'
               ? `Moderate stress detected. Take a moment to breathe.`
               : `Elevated stress detected. Consider a break.`}

@@ -6,7 +6,8 @@
  */
 
 import { extractFeatures } from '@/services/ai/featureEngineering';
-import { loadModel, predictStress, predictAnxiety } from '@/services/ai/stressModel';
+import { loadModel, predictStress } from '@/services/ai/stressModel';
+import { predictAnxiety } from '@/services/ai/anxietyModel';
 import { analyzeSleepSession } from '@/services/ai/sleepAnalysis';
 import { analyzeCheckinLocal } from '@/services/ai/voiceAnalysis';
 import { generateRecommendations } from '@/services/ai/recommendations';
@@ -88,7 +89,7 @@ describe('End-to-End Pipeline: Relaxed State', () => {
     expect(stress.stressLevel).toBeDefined();
 
     // Step 3: Predict anxiety
-    const anxiety = predictAnxiety(stress, features, null, 80);
+    const anxiety = predictAnxiety(features);
     expect(anxiety.anxietyIndex).toBeDefined();
 
     // Step 4: Generate recommendations
@@ -118,7 +119,7 @@ describe('End-to-End Pipeline: Stressed State', () => {
     const stress = predictStress(features);
 
     // Step 3: Predict anxiety
-    const anxiety = predictAnxiety(stress, features, null, 40); // Poor sleep
+    const anxiety = predictAnxiety(features);
 
     // Step 4: Generate recommendations
     const recs = generateRecommendations(stress, anxiety, null, null, null);
@@ -142,11 +143,9 @@ describe('Sleep Pipeline', () => {
     const session: RawSleepSession = {
       startTime: start, endTime: end,
       stages: [
-        { startTime: start, endTime: start + 30 * 60000, stage: 'awake' },
-        { startTime: start + 30 * 60000, endTime: start + 120 * 60000, stage: 'light' },
-        { startTime: start + 120 * 60000, endTime: start + 140 * 60000, stage: 'deep' },
-        { startTime: start + 140 * 60000, endTime: start + 160 * 60000, stage: 'rem' },
-        { startTime: start + 160 * 60000, endTime: start + 210 * 60000, stage: 'light' },
+        { startTime: start, endTime: start + 120 * 60000, stage: 'awake' },
+        { startTime: start + 120 * 60000, endTime: start + 180 * 60000, stage: 'light' },
+        { startTime: start + 180 * 60000, endTime: start + 210 * 60000, stage: 'awake' },
       ],
       source: 'test',
     };

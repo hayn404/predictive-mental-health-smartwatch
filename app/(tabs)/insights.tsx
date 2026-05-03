@@ -243,7 +243,7 @@ export default function InsightsScreen() {
             <Text style={styles.hrvTitle}>What is HRV?</Text>
           </View>
           <Text style={styles.hrvText}>
-            Heart Rate Variability (HRV) measures the specific time changes between each heartbeat. It's a gold standard for mapping your nervous system's resilience.
+            Heart Rate Variability (HRV) measures the specific time changes between each heartbeat. It&apos;s a gold standard for mapping your nervous system&apos;s resilience.
           </Text>
           <View style={styles.hrvStatesRow}>
             <View style={[styles.hrvStateBox, { marginRight: Spacing.sm }]}>

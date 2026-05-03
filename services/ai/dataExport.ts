@@ -6,6 +6,7 @@
  */
 
 import * as FileSystem from 'expo-file-system';
+import { Paths, File as EXFile } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import {
   getBiometricSamples,
@@ -89,8 +90,9 @@ export async function exportHealthData(days: number = 365): Promise<string | nul
 
     // Write to file
     const filename = `seren-health-export-${new Date().toISOString().split('T')[0]}.json`;
-    const filePath = `${FileSystem.documentDirectory}${filename}`;
-    await FileSystem.writeAsStringAsync(filePath, JSON.stringify(exportData, null, 2));
+    const file = new EXFile(Paths.document, filename);
+    file.write(JSON.stringify(exportData, null, 2));
+    const filePath = file.uri;
 
     // Share
     const canShare = await Sharing.isAvailableAsync();
@@ -149,8 +151,9 @@ export async function exportHealthDataFull(days: number = 365): Promise<string |
     };
 
     const filename = `seren-health-export-full-${new Date().toISOString().split('T')[0]}.json`;
-    const filePath = `${FileSystem.documentDirectory}${filename}`;
-    await FileSystem.writeAsStringAsync(filePath, JSON.stringify(exportData, null, 2));
+    const file = new EXFile(Paths.document, filename);
+    file.write(JSON.stringify(exportData, null, 2));
+    const filePath = file.uri;
 
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {

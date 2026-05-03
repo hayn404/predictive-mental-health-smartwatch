@@ -41,6 +41,8 @@ async function loadSpeechModule(): Promise<boolean> {
   if (ExpoSpeech) return true;
   try {
     // Try @react-native-voice/voice first (more reliable)
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore — optional peer dependency, not installed in all environments
     ExpoSpeech = await import('@react-native-voice/voice');
     return true;
   } catch {

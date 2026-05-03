@@ -191,6 +191,30 @@ export interface PersonalBaseline {
 // MODEL OUTPUTS
 // ----------------------------------------------------------
 
+// ----------------------------------------------------------
+// FOCUS MOOD MODEL OUTPUT
+// ----------------------------------------------------------
+
+export type FocusLevel = 'sharp' | 'steady' | 'drifting' | 'scattered';
+
+export interface ElevatedFeature {
+  feature: string;
+  label: string;
+  value: number;
+  direction: 'high' | 'low';
+  impact: number;             // 0-1 contribution weight
+}
+
+/** Focus Mood prediction — cognitive performance readiness from wearable signals */
+export interface FocusPrediction {
+  timestamp: number;
+  focusScore: number;         // 0-100 (higher = sharper focus)
+  focusLevel: FocusLevel;
+  elevatedFeatures: ElevatedFeature[];
+  groqTips: string[];         // Groq-generated actionable tips (empty until loaded)
+  groqLoading: boolean;
+}
+
 /** Stress model prediction result */
 export interface StressPrediction {
   timestamp: number;
@@ -355,6 +379,7 @@ export interface CurrentWellnessState {
   timestamp: number;
   stressPrediction: StressPrediction;
   anxietyPrediction: AnxietyPrediction;
+  focusPrediction: FocusPrediction;
   lastSleep: SleepAnalysis | null;
   latestFeatures: BiometricFeatureVector | null;
   baseline: PersonalBaseline | null;

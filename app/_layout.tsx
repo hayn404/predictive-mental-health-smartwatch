@@ -1,12 +1,20 @@
+import { useEffect } from 'react';
 import { AlertProvider } from '@/template';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { WellnessProvider } from '@/hooks/useWellness';
 import { DraggableFAB } from '@/components/ui/DraggableFAB';
-import { AuthProvider } from '@/template/auth/supabase/context';
+import { NeonAuthProvider as AuthProvider } from '@/template/auth/neon/context';
+import { registerBackgroundInferenceTask } from '@/services/background/inferenceTask';
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Register background inference task on app startup
+    registerBackgroundInferenceTask().catch(err => {
+      console.error('Failed to register background task:', err);
+    });
+  }, []);
   return (
     <AlertProvider>
       <AuthProvider>

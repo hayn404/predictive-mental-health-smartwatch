@@ -19,7 +19,6 @@ import {
   StressPrediction,
   StressLevel,
   StressContributor,
-  AnxietyPrediction,
   PersonalBaseline,
   FEATURE_NAMES,
 } from './types';
@@ -213,65 +212,7 @@ export function predictStress(
   };
 }
 
-/**
- * Predict anxiety index (combines stress score with temporal patterns).
- *
- * Anxiety differs from acute stress:
- * - It considers sustained HRV depression over time
- * - Weights recent sleep quality
- * - Considers time-of-day patterns
- */
-export function predictAnxiety(
-  stressPrediction: StressPrediction,
-  features: BiometricFeatureVector,
-  baseline: PersonalBaseline | null,
-  recentSleepQuality: number | null,
-): AnxietyPrediction {
-  let anxietyIndex = stressPrediction.stressScore;
 
-  if (baseline) {
-    // Factor 1: HRV deviation from personal baseline
-    const rmssdDeviation = baseline.rmssdMean > 0
-      ? (features.rmssd - baseline.rmssdMean) / baseline.rmssdStd
-      : 0;
-    // Negative deviation (lower HRV than usual) increases anxiety
-    if (rmssdDeviation < -1) {
-      anxietyIndex += Math.min(15, Math.abs(rmssdDeviation) * 5);
-    }
-
-    // Factor 2: HR elevation above personal resting
-    const hrDeviation = baseline.restingHrMean > 0
-      ? (features.hrMean - baseline.restingHrMean) / baseline.restingHrStd
-      : 0;
-    if (hrDeviation > 1.5) {
-      anxietyIndex += Math.min(10, hrDeviation * 3);
-    }
-  }
-
-  // Factor 3: Poor recent sleep amplifies anxiety
-  if (recentSleepQuality !== null && recentSleepQuality < 60) {
-    anxietyIndex += (60 - recentSleepQuality) * 0.2; // Up to +12 for very poor sleep
-  }
-
-  // Factor 4: LF/HF ratio elevation (sympathetic dominance)
-  if (features.lfHfRatio > 3) {
-    anxietyIndex += Math.min(10, (features.lfHfRatio - 3) * 2);
-  }
-
-  anxietyIndex = Math.max(0, Math.min(100, Math.round(anxietyIndex)));
-
-  const baselineDeviation = baseline
-    ? (features.rmssd - baseline.rmssdMean) / (baseline.rmssdStd || 1)
-    : 0;
-
-  return {
-    timestamp: features.timestamp,
-    anxietyIndex,
-    level: getAnxietyLevel(anxietyIndex),
-    sustained: false, // Set by the pipeline when it tracks duration
-    baselineDeviation: Math.max(-1, Math.min(1, baselineDeviation / 3)),
-  };
-}
 
 // ============================================================
 // Rule-Based Fallback (when model isn't loaded)
@@ -325,12 +266,7 @@ function getStressLevel(score: number): StressLevel {
   return 'high';
 }
 
-function getAnxietyLevel(index: number): AnxietyPrediction['level'] {
-  if (index <= 20) return 'minimal';
-  if (index <= 45) return 'mild';
-  if (index <= 70) return 'moderate';
-  return 'severe';
-}
+
 
 function computeConfidence(features: BiometricFeatureVector): number {
   // Confidence based on data quality

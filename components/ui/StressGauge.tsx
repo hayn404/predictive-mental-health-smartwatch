@@ -60,8 +60,8 @@ export function StressGauge({ value, size = 180 }: StressGaugeProps) {
         </G>
       </Svg>
       <View style={styles.centerContent}>
-        <Text style={styles.valueText}>{Math.round(value)}</Text>
-        <Text style={styles.labelText}>{label.toUpperCase()}</Text>
+        <Text style={styles.valueText} adjustsFontSizeToFit numberOfLines={1}>{Math.round(value)}</Text>
+        <Text style={styles.labelText} adjustsFontSizeToFit numberOfLines={1}>{label.toUpperCase()}</Text>
       </View>
     </View>
   );
@@ -84,10 +84,12 @@ const styles = StyleSheet.create({
     lineHeight: 52,
   },
   labelText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: Colors.textSecondary,
-    letterSpacing: 1,
-    marginTop: 2,
+    letterSpacing: 0.5,
+    marginTop: 0,
+    paddingHorizontal: 10,
+    textAlign: 'center',
   },
 });
