@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/constants/theme';
-import { GlassCard } from '@/components/ui/GlassCard';
+
 
 type Phase = 'Inhale' | 'Hold' | 'Exhale' | 'HoldOut';
 
@@ -23,7 +23,7 @@ export default function BreathingActivityScreen() {
             scaleAnim.stopAnimation();
             opacityAnim.stopAnimation();
         };
-    }, []);
+    }, [scaleAnim, opacityAnim]);
 
     const startBreathingCycle = () => {
         // Phase 1: Inhale (4s)
@@ -88,7 +88,7 @@ export default function BreathingActivityScreen() {
             ]).start();
             setPhase('Inhale');
         }
-    }, [isActive]);
+    }, [isActive, scaleAnim, opacityAnim, startBreathingCycle]);
 
     const toggleSession = () => {
         setIsActive(!isActive);

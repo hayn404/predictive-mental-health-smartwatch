@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
-import { Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { getStressLabel } from '@/services/mockData';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -21,7 +21,7 @@ export function StressGauge({ value, size = 180 }: StressGaugeProps) {
       duration: 1000,
       useNativeDriver: true,
     }).start();
-  }, [value]);
+  }, [value, animatedValue]);
 
   const radius = (size - 20) / 2;
   const strokeWidth = 12;

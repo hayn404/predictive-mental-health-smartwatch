@@ -37,12 +37,10 @@ jobs:
         run: npm install -g pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Type check
         run: npx tsc --noEmit
-        continue-on-error: true
 
       - name: Lint
-        run: npx expo lint
-        continue-on-error: true
+        run: npm run lint

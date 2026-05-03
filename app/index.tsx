@@ -15,7 +15,7 @@ export default function Index() {
     } else {
       router.replace('/onboarding/welcome' as any);
     }
-  }, [initialized, loading, isAuthenticated]);
+  }, [initialized, loading, isAuthenticated, router]);
 
   // Show loading while checking auth state
   return (
