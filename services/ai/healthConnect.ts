@@ -29,6 +29,7 @@ import {
   RawSpO2Sample,
   RawRespiratoryRateSample,
 } from './types';
+import { generateMockBiometricSample, generateMockSleepSession } from './mockHealthData';
 
 // ============================================================
 // Health Connect Permission Types
@@ -333,24 +334,83 @@ function mapHealthConnectSleepStage(stage: number): RawSleepSession['stages'][0]
 // Mock Health Connect Service (for development)
 // ============================================================
 
-export function createMockHealthConnectService(): HealthConnectService {
-  // Simulate exam stress conditions
-  const isExamTime = true; // Mock data simulates someone in an exam
+import { generateMockBiometricSample, generateMockSleepSession } from './mockHealthData';
 
-  const generateHRSamples = (start: number, end: number): RawHeartRateSample[] => {
-    const samples: RawHeartRateSample[] = [];
-    const interval = 5000; // Every 5 seconds
-    for (let t = start; t < end; t += interval) {
-      // Exam stress: HR 90-110 BPM | Normal: 65-85 BPM
-      const bpm = isExamTime ? 95 + Math.random() * 20 : 65 + Math.random() * 20;
-      samples.push({
-        timestamp: t,
-        bpm,
+export function createMockHealthConnectService(): HealthConnectService {
+  return {
+    async isAvailable() { return true; },
+    async requestPermissions() { return true; },
+    async hasPermissions() { return true; },
+    
+    async readHeartRate(start, end) {
+      const samples: RawHeartRateSample[] = [];
+      let t = start;
+      while (t < end) {
+        const mock = generateMockBiometricSample(t);
+        samples.push({
+          timestamp: mock.timestamp,
+          bpm: mock.heartRate,
+          source: 'mock.samsung.health',
+        });
+        t += 5 * 60 * 1000;
+      }
+      return samples;
+    },
+    
+    async readHRV(start, end) {
+      const samples: RawHRVSample[] = [];
+      let t = start;
+      while (t < end) {
+        const mock = generateMockBiometricSample(t);
+        samples.push({
+          timestamp: mock.timestamp,
+          rmssd: mock.hrv_rmssd,
+        });
+        t += 5 * 60 * 1000;
+      }
+      return samples;
+    },
+    
+    async readSleepSessions(start, end) {
+      const session = generateMockSleepSession();
+      return [{
+        startTime: session.startTime,
+        endTime: session.endTime,
+        stages: session.stages.map(s => ({
+          startTime: s.startTime,
+          endTime: s.endTime,
+          stage: s.stage as any,
+        })),
         source: 'mock.samsung.health',
-      });
-    }
-    return samples;
+      }];
+    },
+    
+    async readSteps(start, end) {
+      return [{ startTime: start, endTime: end, count: 4500 + Math.floor(Math.random() * 3000) }];
+    },
+    
+    async readTemperature(start, end) {
+      const samples: RawTemperatureSample[] = [];
+      let t = start;
+      while (t < end) {
+        const mock = generateMockBiometricSample(t);
+        samples.push({ timestamp: mock.timestamp, temperatureCelsius: mock.skinTemperature });
+        t += 60000;
+      }
+      return samples;
+    },
+    
+    async readSpO2(start, end) {
+      const mock = generateMockBiometricSample((start + end) / 2);
+      return [{ timestamp: mock.timestamp, percentage: mock.spo2 }];
+    },
+    
+    async readRespiratoryRate(start, end) {
+      const mock = generateMockBiometricSample((start + end) / 2);
+      return [{ timestamp: mock.timestamp, breathsPerMinute: mock.respiratoryRate }];
+    },
   };
+}
 
   const generateHRVSamples = (start: number, end: number): RawHRVSample[] => {
     const samples: RawHRVSample[] = [];
