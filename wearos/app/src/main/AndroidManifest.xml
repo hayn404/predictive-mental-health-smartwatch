@@ -49,6 +49,12 @@
             android:exported="false"
             android:foregroundServiceType="health" />
 
+        <!-- Sleep capture foreground service (HR + accel → 30s feature batches → phone) -->
+        <service
+            android:name=".sleep.SleepCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
         <!-- TODO: Wear Tile Service (implement when Tiles Material 3 is integrated) -->
 
         <!-- Standalone Wear OS app (no phone companion required) -->
