@@ -1,5 +1,4 @@
 import * as TaskManager from 'expo-task-manager';
-import * as BackgroundFetch from 'expo-background-fetch';
 import Constants from 'expo-constants';
 
 const BACKGROUND_INFERENCE_TASK = 'BACKGROUND_INFERENCE_TASK';
@@ -39,28 +38,15 @@ export async function registerBackgroundInferenceTask() {
     return;
   }
 
-  try {
-    const isAvailable = await TaskManager.isAvailableAsync();
-    if (!isAvailable) {
-      console.warn('[Background Task] TaskManager not available on this device');
-      return;
-    }
-
-    await BackgroundFetch.registerTaskAsync(BACKGROUND_INFERENCE_TASK, {
-      minimumInterval: 15 * 60, // 15 minutes (OS minimum on Android/iOS)
-      stopOnTerminate: false,
-      startOnBoot: true,
-    });
-
-    console.log('[Background Task] Successfully registered background inference task');
-  } catch (err: any) {
-    // Tolerate "already registered" errors on hot reload
-    if (err?.message?.includes('already registered')) {
-      console.log('[Background Task] Already registered — skipping');
-      return;
-    }
-    console.warn('[Background Task] Failed to register:', err);
-  }
+  // Background execution is currently DISABLED (gap S3): the inference body above is a
+  // stub, and the native background-fetch module isn't installed. To enable it later:
+  //   1. npx expo install expo-background-fetch   (then rebuild the native app)
+  //   2. re-add: import * as BackgroundFetch from 'expo-background-fetch'
+  //   3. register the task here:
+  //        await BackgroundFetch.registerTaskAsync(BACKGROUND_INFERENCE_TASK, {
+  //          minimumInterval: 15 * 60, stopOnTerminate: false, startOnBoot: true });
+  //   4. implement runBackgroundInference() (extract features -> predict -> persist).
+  console.log('[Background Task] Background inference disabled (not yet implemented).');
 }
 
 export async function unregisterBackgroundInferenceTask() {
