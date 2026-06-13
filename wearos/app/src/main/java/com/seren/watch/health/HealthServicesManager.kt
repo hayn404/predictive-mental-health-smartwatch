@@ -1,6 +1,10 @@
 package com.seren.watch.health
 
 import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.util.Log
 import androidx.health.services.client.HealthServices
 import androidx.health.services.client.MeasureCallback
@@ -23,6 +27,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.Executors
+import kotlin.math.sqrt
 
 /**
  * Manages Health Services API on the watch.
@@ -38,6 +43,8 @@ class HealthServicesManager(private val context: Context) {
     private val measureClient: MeasureClient = healthClient.measureClient
     private val passiveClient: PassiveMonitoringClient = healthClient.passiveMonitoringClient
     private val executor = Executors.newSingleThreadExecutor()
+    private val sensorManager: SensorManager =
+        context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
     private val _wellnessState = MutableStateFlow(WellnessState())
     val wellnessState: StateFlow<WellnessState> = _wellnessState.asStateFlow()
@@ -118,6 +125,42 @@ class HealthServicesManager(private val context: Context) {
             Log.d(TAG, "Passive monitoring started")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start passive monitoring", e)
+        }
+    }
+
+    /**
+     * Accelerometer magnitude stream (gravity-included Euclidean norm, g units).
+     * Matches `acc_magnitude` in ml/sleep/prepare_features.py — sqrt(ax² + ay² + az²)
+     * where each axis is in m/s² normalized to g (÷ 9.80665).
+     *
+     * Sampling rate is requested at ~25 Hz (SENSOR_DELAY_GAME → 20 ms target).
+     * Each emission carries (timestampMs, magnitudeG).
+     */
+    fun accelerometerFlow(): Flow<AccelSample> = callbackFlow {
+        val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        if (accel == null) {
+            Log.w(TAG, "No TYPE_ACCELEROMETER sensor on this device")
+            close()
+            return@callbackFlow
+        }
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                val ax = event.values[0] / 9.80665f
+                val ay = event.values[1] / 9.80665f
+                val az = event.values[2] / 9.80665f
+                val mag = sqrt(ax * ax + ay * ay + az * az)
+                // Convert event.timestamp (nanos since boot) → epoch ms.
+                val deltaNanos = event.timestamp - System.nanoTime()
+                val tsMs = System.currentTimeMillis() + deltaNanos / 1_000_000L
+                trySend(AccelSample(tsMs, mag))
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        sensorManager.registerListener(listener, accel, SensorManager.SENSOR_DELAY_GAME)
+        Log.d(TAG, "Accel capture started @ SENSOR_DELAY_GAME (~25 Hz)")
+        awaitClose {
+            sensorManager.unregisterListener(listener)
+            Log.d(TAG, "Accel capture stopped")
         }
     }
 
