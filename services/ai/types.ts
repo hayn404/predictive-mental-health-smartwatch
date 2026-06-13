@@ -220,6 +220,7 @@ export interface StressPrediction {
   timestamp: number;
   stressScore: number;          // 0-100
   stressLevel: StressLevel;
+  isStressed?: boolean;         // binary call using the model's calibrated decisionThreshold
   confidence: number;           // 0-1
   topContributors: StressContributor[];
 }
