@@ -150,20 +150,27 @@ function normalizeFeatures(
 ): Record<string, number> {
   const normalized: Record<string, number> = {};
 
-  for (const name of model.features) {
+  model.features.forEach((name, i) => {
     const raw = (features as any)[name] ?? 0;
     const mean = model.normalization.mean[name] ?? 0;
     const stdDev = model.normalization.std[name] ?? 1;
 
+    let value: number;
     // Handle activityType encoding: sedentary=0, walking=1, active=2, sleeping=3
     if (name === 'activityType') {
       const actMap: Record<string, number> = { sedentary: 0, walking: 1, active: 2, sleeping: 3 };
       const encoded = typeof raw === 'string' ? (actMap[raw] ?? 0) : raw;
-      normalized[name] = stdDev > 0 ? (encoded - mean) / stdDev : 0;
+      value = stdDev > 0 ? (encoded - mean) / stdDev : 0;
     } else {
-      normalized[name] = stdDev > 0 ? (raw - mean) / stdDev : 0;
+      value = stdDev > 0 ? (raw - mean) / stdDev : 0;
     }
-  }
+
+    normalized[name] = value;
+    // Alias by positional index: XGBoost dumps trees with split keys "f0".."fN"
+    // (feature indices) when trained on a numpy array, so node.split is "f{i}", not the
+    // feature name. Expose both keys -> tree traversal resolves regardless of dump format.
+    normalized[`f${i}`] = value;
+  });
 
   return normalized;
 }

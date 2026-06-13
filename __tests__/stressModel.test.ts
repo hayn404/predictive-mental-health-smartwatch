@@ -256,3 +256,48 @@ describe('predictAnxiety', () => {
     expect(result.baselineDeviation).toBeLessThanOrEqual(1);
   });
 });
+
+// ============================================================
+// Real shipped model — regression guard
+// Loads the actual exported model (assets/ml/stress/) and asserts it RESPONDS to
+// inputs. Catches the f{i}-vs-name split-key bug, where index-keyed tree splits
+// failed to resolve against name-keyed features and the score went near-constant.
+// ============================================================
+
+describe('Real shipped stress model', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const realModel = require('@/assets/ml/stress/stress_model.json');
+
+  beforeAll(() => {
+    loadModel(realModel);
+  });
+
+  test('uses f{i}-indexed tree splits (export format being guarded)', () => {
+    const splits = new Set<string>();
+    const walk = (n: any) => {
+      if (n.split !== undefined) splits.add(String(n.split));
+      (n.children || []).forEach(walk);
+    };
+    realModel.trees.forEach(walk);
+    // If this changes to feature names, the alias fix is still safe, but this documents intent.
+    expect([...splits].some(s => /^f\d+$/.test(s))).toBe(true);
+  });
+
+  test('responds to inputs: a stressed window scores higher than a calm one', () => {
+    const calm = makeFeatureVector({
+      meanRR: 950, hrMean: 63, rmssd: 60, sdnn: 65, pnn50: 45, pnn20: 75, cvRR: 0.068,
+      sd1: 42, sd2: 60, sampleEntropy: 1.8, dfaAlpha1: 0.9,
+    });
+    const stressed = makeFeatureVector({
+      meanRR: 650, hrMean: 92, rmssd: 15, sdnn: 20, pnn50: 3, pnn20: 12, cvRR: 0.030,
+      sd1: 11, sd2: 22, sampleEntropy: 1.0, dfaAlpha1: 1.3,
+    });
+
+    const calmScore = predictStress(calm).stressScore;
+    const stressedScore = predictStress(stressed).stressScore;
+
+    // The bug made these nearly identical (~baseScore). Require a real, directional gap.
+    expect(Math.abs(stressedScore - calmScore)).toBeGreaterThan(5);
+    expect(stressedScore).toBeGreaterThan(calmScore);
+  });
+});
