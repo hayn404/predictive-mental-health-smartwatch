@@ -4,9 +4,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { AuthUser, SendOTPOptions } from '../types';
 
-// WARNING: In production, move this to a server-side API and do not expose DB credentials in the client bundle.
-const DATABASE_URL =
-  'postgresql://neondb_owner:npg_iLGRXxrD7tl5@ep-frosty-mode-amkt0rpn-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require';
+// Connection string comes from the environment (see .env.example) — credentials must
+// NOT be hardcoded. NOTE: Expo inlines EXPO_PUBLIC_* into the client bundle, so a direct
+// client -> Postgres connection still ships this secret. The production-grade fix is a
+// server-side API or Supabase RLS so the credential never reaches the client.
+const DATABASE_URL = process.env.EXPO_PUBLIC_DATABASE_URL ?? '';
+if (!DATABASE_URL) {
+  console.warn('[Seren] EXPO_PUBLIC_DATABASE_URL is not set — copy .env.example to .env; auth will fail until it is set.');
+}
 
 const sql = neon(DATABASE_URL);
 
@@ -66,7 +71,9 @@ function mapRow(row: any): AuthUser {
 }
 
 async function createSession(userId: string): Promise<void> {
-  const token = `seren_${Date.now()}_${Math.random().toString(36).slice(2, 18)}`;
+  // Cryptographically-secure session token (Date.now()+Math.random() is guessable).
+  const rand = await Crypto.getRandomBytesAsync(24);
+  const token = 'seren_' + Array.from(rand, (b) => b.toString(16).padStart(2, '0')).join('');
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   await sql`
