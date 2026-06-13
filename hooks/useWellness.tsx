@@ -59,6 +59,8 @@ import { getFocusTips } from '@/services/ai/focusRecommendations';
 import { extractFeatures } from '@/services/ai/featureEngineering';
 import { computeBaseline, shouldRecomputeBaseline, detectAnomalies, AnomalyFlag } from '@/services/ai/baseline';
 import { analyzeSleepSession, computeSleepTrend, SleepTrend } from '@/services/ai/sleepAnalysis';
+import { loadV32SleepModel, isV32SleepModelLoaded } from '@/services/ai/sleepStageModel';
+import { processPendingSessions } from '@/services/ai/sleepReceiver';
 import { analyzeCheckin, computeCheckinTrend, CheckinTrend } from '@/services/ai/voiceAnalysis';
 import { generateRecommendations } from '@/services/ai/recommendations';
 import {
@@ -262,6 +264,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
   // Status
   const [modelLoaded, setModelLoaded] = useState(false);
+  const [sleepModelReady, setSleepModelReady] = useState(false);
   const [watchConnected, setWatchConnected] = useState(false);
   const [healthConnectAvailable, setHealthConnectAvailable] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(new Date());
@@ -289,10 +292,16 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
     await Promise.all([
       loadModels(),
+      loadSleepStageModel(),
       initDb(),
       initHealthConnect(),
       initNotifications(),
     ]);
+    // Drain any sleep batches the Wear OS companion persisted while the
+    // phone app was closed. Runs once per app open; subsequent batches
+    // arrive live via the WearableSleepListenerService and are processed
+    // here on the next open.
+    processWearSleepSessions();
     generateInitialChartData();
     initLocationAndSunlight();
   }
@@ -309,6 +318,61 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       setModelLoaded(true);
     } catch (e) {
       console.warn('[Seren] Failed to load ML models:', e);
+    }
+  }
+
+  async function loadSleepStageModel() {
+    try {
+      const modelAsset = Asset.fromModule(require('@/assets/ml/sleep_stage_model.onnx'));
+      await modelAsset.downloadAsync();
+      if (modelAsset.localUri) {
+        await loadV32SleepModel(modelAsset.localUri);
+        setSleepModelReady(isV32SleepModelLoaded());
+      }
+    } catch (e) {
+      console.warn('[Seren] v3.2 sleep model not available (will use Health Connect stages):', e);
+      setSleepModelReady(false);
+    }
+  }
+
+  /**
+   * Drain any sleep feature batches the Wear OS companion persisted while the
+   * phone was closed. Each finalized session becomes a SleepAnalysis record.
+   */
+  async function processWearSleepSessions() {
+    try {
+      if (!isV32SleepModelLoaded()) return;
+      const results = await processPendingSessions();
+      for (const r of results) {
+        if (!r.output) {
+          console.log(`[Seren] Skipped watch session ${r.captureStartMs}: ${r.skipped}`);
+          continue;
+        }
+        const fakeSession = {
+          startTime: r.output.sessionStart,
+          endTime: r.output.sessionEnd,
+          stages: r.output.mlStages,
+          source: 'com.seren.watch.v3.2',
+        };
+        const analysis = analyzeSleepSession(
+          fakeSession as any,
+          undefined,
+          undefined,
+          baseline,
+          r.output.mlStages,
+        );
+        setLastSleep(analysis);
+        sleepHistory.current.push(analysis);
+        setSleepTrend(computeSleepTrend(sleepHistory.current));
+        if (dbReadyRef.current) {
+          insertSleepSession(analysis).catch(() => {});
+        }
+        console.log(
+          `[Seren] Wear OS sleep session ${r.captureStartMs}: ${r.epochsReceived} epochs → v3.2 classified`,
+        );
+      }
+    } catch (e) {
+      console.warn('[Seren] processWearSleepSessions failed:', e);
     }
   }
 
@@ -739,7 +803,12 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
       if (sessions.length > 0) {
         const latest = sessions[sessions.length - 1];
-        const analysis = analyzeSleepSession(latest);
+
+        // v3.2 sleep classification runs only from Wear OS feature batches
+        // (Health Connect doesn't expose the raw accel the model needs).
+        // When no watch session is available for this period we fall back to
+        // Health Connect's pre-classified stages.
+        const analysis = analyzeSleepSession(latest, undefined, undefined, baseline);
         setLastSleep(analysis);
         sleepHistory.current.push(analysis);
         setSleepTrend(computeSleepTrend(sleepHistory.current));

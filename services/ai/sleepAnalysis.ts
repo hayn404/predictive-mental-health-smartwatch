@@ -54,14 +54,17 @@ const WEIGHTS = {
  * @param hrDuringSleep - Heart rate samples during sleep window (optional)
  * @param hrvDuringSleep - HRV samples during sleep window (optional)
  * @param baseline - Personal baseline for consistency scoring (optional)
+ * @param mlStages - ML-classified stages to use instead of Health Connect stages (optional)
  */
 export function analyzeSleepSession(
   session: RawSleepSession,
   hrDuringSleep?: RawHeartRateSample[],
   hrvDuringSleep?: RawHRVSample[],
   baseline?: PersonalBaseline | null,
+  mlStages?: RawSleepStage[],
 ): SleepAnalysis {
-  const stages = session.stages;
+  // Use ML-classified stages when available, fall back to Health Connect
+  const stages = mlStages && mlStages.length > 0 ? mlStages : session.stages;
 
   // ---- Compute stage durations ----
   const stageDurations = computeStageDurations(stages);

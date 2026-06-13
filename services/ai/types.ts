@@ -76,7 +76,7 @@ export interface RawRespiratoryRateSample {
 // ----------------------------------------------------------
 
 /**
- * 29 HRV + biometric features computed per 5-minute window.
+ * 29 HRV + biometric features computed per 60-second window.
  * This is the input vector for the stress prediction model.
  *
  * Feature groups:
@@ -88,7 +88,7 @@ export interface RawRespiratoryRateSample {
  */
 export interface BiometricFeatureVector {
   timestamp: number;
-  windowSeconds: number;    // Typically 300 (5 min)
+  windowSeconds: number;    // 60 seconds — matches real-time smartwatch polling
 
   // ---- Time-domain HRV (9) ----
   meanRR: number;           // Mean RR interval in ms
@@ -282,6 +282,29 @@ export interface SleepAnalysis {
   qualityScore: number;         // 0-100
   recoveryScore: number;        // 0-100 (HRV-based)
   consistencyScore: number;     // 0-100 (vs usual schedule)
+}
+
+// ----------------------------------------------------------
+// ML SLEEP STAGE CLASSIFICATION
+// ----------------------------------------------------------
+
+/** Single epoch prediction from the sleep stage ML model */
+export interface SleepEpochPrediction {
+  epochIndex: number;
+  startTime: number;          // Unix ms
+  endTime: number;
+  predictedStage: number;     // 0=Wake, 1=N1, 2=N2, 3=N3, 4=REM
+  confidence: number;         // 0-1 (max softmax probability)
+  probabilities: number[];    // [pWake, pN1, pN2, pN3, pREM]
+}
+
+/** Full night of ML sleep stage predictions */
+export interface SleepStageModelOutput {
+  sessionStart: number;
+  sessionEnd: number;
+  epochs: SleepEpochPrediction[];
+  modelVersion: string;
+  mlStages: RawSleepStage[];  // Converted to app format for analyzeSleepSession()
 }
 
 // ----------------------------------------------------------
