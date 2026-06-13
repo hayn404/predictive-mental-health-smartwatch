@@ -23,7 +23,7 @@
 import { SleepStageType, RawSleepStage } from './types';
 
 // ────────────────────────────────────────────────────────────────
-// Contract — must match assets/ml/sleep_model_metadata.json
+// Contract — must match assets/ml/sleep/sleep_model_metadata.json
 // ────────────────────────────────────────────────────────────────
 export const V32_NUM_FEATURES = 12;
 export const V32_SEQ_LEN = 41;
