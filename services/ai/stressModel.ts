@@ -52,6 +52,7 @@ interface XGBoostModel {
   trees: XGBoostNode[];
   stressLevels: Record<string, { min: number; max: number; label: string; color: string }>;
   importances: Record<string, number>;
+  decisionThreshold?: number;   // calibrated prob cutoff for "stressed" (base-rate matched)
 }
 
 // ============================================================
@@ -195,6 +196,14 @@ export function predictStress(
     return ruleBasedStressEstimate(features, baseline);
   }
 
+  // S7 — input quality gate: a window with no usable RR/HR signal would feed garbage
+  // (all-zero features) into the model. Fall back to the rule-based estimate at low
+  // confidence rather than emit a confident-looking but meaningless score.
+  if (!hasUsableSignal(features)) {
+    const fb = ruleBasedStressEstimate(features, baseline);
+    return { ...fb, confidence: Math.min(fb.confidence, 0.3) };
+  }
+
   // Normalize features using training scaler
   const normalizedFeatures = normalizeFeatures(features, cachedModel);
 
@@ -204,16 +213,20 @@ export function predictStress(
   // Scale to 0-100 stress score
   const stressScore = Math.round(probability * 100);
 
-  // Determine stress level
-  const stressLevel = getStressLevel(stressScore);
+  // S2 — use the model's calibrated decision threshold for the binary stressed call
+  // and to anchor the severity bands (instead of a hardcoded 0.5 / 25-50-75).
+  const threshold = cachedModel.decisionThreshold ?? 0.5;
+  const isStressed = probability >= threshold;
+  const stressLevel = getStressLevel(stressScore, threshold);
 
-  // Identify top contributing factors
+  // Identify top contributing factors (from the model's own importances)
   const contributors = identifyContributors(features, cachedModel, baseline);
 
   return {
     timestamp: features.timestamp,
     stressScore,
     stressLevel,
+    isStressed,
     confidence: computeConfidence(features),
     topContributors: contributors,
   };
@@ -257,6 +270,7 @@ function ruleBasedStressEstimate(
     timestamp: features.timestamp,
     stressScore: score,
     stressLevel: getStressLevel(score),
+    isStressed: score >= 50,
     confidence: 0.6, // Lower confidence for rule-based
     topContributors: [],
   };
@@ -266,11 +280,26 @@ function ruleBasedStressEstimate(
 // Helper Functions
 // ============================================================
 
-function getStressLevel(score: number): StressLevel {
-  if (score <= 25) return 'low';
-  if (score <= 50) return 'moderate';
-  if (score <= 75) return 'elevated';
+/**
+ * Map a 0-100 score to a 4-band severity, anchored on the model's calibrated decision
+ * threshold (S2): scores below the threshold are "not stressed" (low/moderate), at/above
+ * are "stressed" (elevated/high). Falls back to 0.5 (the old 25/50/75 behaviour).
+ */
+function getStressLevel(score: number, threshold = 0.5): StressLevel {
+  const t = threshold * 100;                          // stressed/not boundary
+  if (score < t * 0.5) return 'low';
+  if (score < t) return 'moderate';                   // below threshold -> not stressed
+  if (score < t + (100 - t) / 2) return 'elevated';   // at/above threshold -> stressed
   return 'high';
+}
+
+/**
+ * S7 — does this window carry a usable cardiac signal? Without real RR intervals
+ * (rmssd/meanRR == 0) or with an implausible heart rate, the HRV features are zeros
+ * and the model output is meaningless.
+ */
+function hasUsableSignal(f: BiometricFeatureVector): boolean {
+  return f.rmssd > 0 && f.meanRR > 0 && f.hrMean >= 30 && f.hrMean <= 220;
 }
 
 
@@ -291,65 +320,62 @@ function computeConfidence(features: BiometricFeatureVector): number {
   return Math.max(0.1, Math.min(1, confidence));
 }
 
+// Direction-aware, human-readable labels for the features the stress model uses.
+// {high} = value at/above the typical (training-mean) level, {low} = below it.
+const FEATURE_LABELS: Record<string, { high: string; low: string }> = {
+  meanRR:        { high: 'Slower heart rate',              low: 'Faster heart rate' },
+  hrMean:        { high: 'Elevated heart rate',            low: 'Lower heart rate' },
+  hrStd:         { high: 'Variable heart rate',            low: 'Steady heart rate' },
+  hrRange:       { high: 'Wide heart-rate swings',         low: 'Narrow heart-rate range' },
+  sdnn:          { high: 'Higher heart-rate variability',  low: 'Reduced heart-rate variability' },
+  rmssd:         { high: 'Higher vagal (recovery) tone',   low: 'Low HRV (RMSSD)' },
+  pnn50:         { high: 'High beat-to-beat variability',  low: 'Low beat-to-beat variability' },
+  pnn20:         { high: 'High beat-to-beat variability',  low: 'Low beat-to-beat variability' },
+  cvRR:          { high: 'Higher RR variability',          low: 'Lower RR variability' },
+  sd1:           { high: 'Higher short-term variability',  low: 'Lower short-term variability' },
+  sd2:           { high: 'Higher long-term variability',   low: 'Lower long-term variability' },
+  sd1sd2Ratio:   { high: 'Balanced autonomic activity',    low: 'Sympathetic dominance' },
+  sampleEntropy: { high: 'Complex (healthy) rhythm',       low: 'Reduced signal complexity' },
+  dfaAlpha1:     { high: 'More rigid heart rhythm',        low: 'More adaptive heart rhythm' },
+};
+
+/**
+ * S4 — explain a prediction from the MODEL's own feature importances (not a fixed
+ * rule list). Ranks the model's features by importance, then labels each by whether
+ * the current value is above/below the training-mean reference.
+ */
 function identifyContributors(
   features: BiometricFeatureVector,
   model: XGBoostModel,
   baseline?: PersonalBaseline | null,
 ): StressContributor[] {
-  const contributors: StressContributor[] = [];
-  const importances = model.importances;
+  const imp = model.importances || {};
+  const mean = model.normalization?.mean || {};
+  const total = model.features.reduce((s, f) => s + (imp[f] || 0), 0) || 1;
 
-  // Get top features by importance and check their state
-  const featureChecks: { feature: string; label: string; condition: boolean; impact: number }[] = [
-    {
-      feature: 'rmssd',
-      label: features.rmssd < 30 ? 'Very low HRV' : 'Low HRV',
-      condition: features.rmssd < 40,
-      impact: importances['rmssd'] || 0.15,
-    },
-    {
-      feature: 'lfHfRatio',
-      label: 'High sympathetic activation',
-      condition: features.lfHfRatio > 2.5,
-      impact: importances['lfHfRatio'] || 0.12,
-    },
-    {
-      feature: 'hrMean',
-      label: 'Elevated heart rate',
-      condition: features.hrMean > 80,
-      impact: importances['hrMean'] || 0.10,
-    },
-    {
-      feature: 'sdnn',
-      label: 'Reduced heart rate variability',
-      condition: features.sdnn < 40,
-      impact: importances['sdnn'] || 0.10,
-    },
-    {
-      feature: 'tempSlope',
-      label: 'Dropping skin temperature',
-      condition: features.tempSlope < -0.05,
-      impact: importances['tempSlope'] || 0.05,
-    },
-    {
-      feature: 'hfPower',
-      label: 'Low vagal tone',
-      condition: features.hfPower < (features.totalPower * 0.2),
-      impact: importances['hfPower'] || 0.08,
-    },
-  ];
-
-  for (const check of featureChecks) {
-    if (check.condition) {
-      contributors.push({
-        feature: check.feature,
-        label: check.label,
-        impact: check.impact,
-      });
-    }
+  const ranked = [...model.features].sort((a, b) => (imp[b] || 0) - (imp[a] || 0));
+  const out: StressContributor[] = [];
+  for (const f of ranked) {
+    const val = (features as any)[f];
+    const labels = FEATURE_LABELS[f];
+    if (typeof val !== 'number' || !labels || (imp[f] || 0) <= 0) continue;
+    // Reference = per-user baseline where available, else the model's training mean.
+    const ref = baselineRef(f, baseline) ?? mean[f] ?? val;
+    out.push({
+      feature: f,
+      label: val >= ref ? labels.high : labels.low,
+      impact: (imp[f] || 0) / total,
+    });
+    if (out.length >= 3) break;
   }
+  return out;
+}
 
-  // Sort by impact and take top 3
-  contributors.sort((a, b) => b.impact - a.impact);
-  return contributors.slice(0, 3);
+/** Per-user reference value for a feature, if the baseline carries it. */
+function baselineRef(feature: string, baseline?: PersonalBaseline | null): number | null {
+  if (!baseline) return null;
+  if (feature === 'rmssd') return baseline.rmssdMean;
+  if (feature === 'sdnn') return baseline.sdnnMean;
+  if (feature === 'hrMean') return baseline.restingHrMean;
+  return null;
 }
