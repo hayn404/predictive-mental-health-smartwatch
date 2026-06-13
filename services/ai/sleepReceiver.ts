@@ -118,7 +118,7 @@ async function readBinary(uri: string): Promise<ArrayBuffer> {
   return base64ToArrayBuffer(b64);
 }
 
-function base64ToArrayBuffer(b64: string): ArrayBuffer {
+export function base64ToArrayBuffer(b64: string): ArrayBuffer {
   // Lightweight base64 → bytes that works in Hermes without atob polyfill.
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   const lookup = new Uint8Array(128);
@@ -140,7 +140,7 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-function decodeBatch(buf: ArrayBuffer): RawEpochFeatures[] {
+export function decodeBatch(buf: ArrayBuffer): RawEpochFeatures[] {
   const dv = new DataView(buf);
   if (buf.byteLength < 24) throw new Error(`batch too small: ${buf.byteLength} bytes`);
   const magic = dv.getInt32(0, true);
