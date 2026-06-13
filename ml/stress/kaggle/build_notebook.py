@@ -26,7 +26,7 @@ md(r"""
 
 Self-contained pipeline: **load WESAD → extract HRV + PPG-morphology features (parallel)
 → train XGBoost → export `stress_model.json` + `model_metadata.json`** in the exact format
-the React Native app reads from `assets/ml/`.
+the React Native app reads from `assets/ml/stress/`.
 
 **Why Kaggle is faster:** feature extraction (sample-entropy is O(N²) per window) is parallelised
 across all CPU cores with `joblib`, turning minutes into seconds. WESAD is already hosted on
@@ -35,7 +35,7 @@ Kaggle, so there is no 2 GB download.
 ### Setup (one time)
 1. *Add Data* → search **WESAD** → add a dataset that contains `S2/S2.pkl … S17/S17.pkl`.
 2. Set `WESAD_ROOT` below to that dataset's folder (printed by the first cell).
-3. *Run All*. Outputs land in `/kaggle/working/` — download them into the repo's `assets/ml/`.
+3. *Run All*. Outputs land in `/kaggle/working/` — download them into the repo's `assets/ml/stress/`.
 
 ### Knobs (see the CONFIG cell)
 - `TRAIN_ON` / `EVAL_ON` — which dataset trains the exported model and which is the
@@ -913,8 +913,8 @@ print("Wrote:")
 print("  /kaggle/working/stress_model.json    ", round((out/"stress_model.json").stat().st_size/1024,1),"KB")
 print("  /kaggle/working/model_metadata.json")
 print("\nTop features:", sorted(imp.items(),key=lambda kv:-kv[1])[:8])
-print("\nDownload both from the Kaggle 'Output' tab into the repo's assets/ml/ "
-      "(and ml/models/). If USE_MORPHOLOGY or per_subject were on, apply the matching "
+print("\nDownload both from the Kaggle 'Output' tab into the repo's assets/ml/stress/ "
+      "(and ml/stress/models/). If USE_MORPHOLOGY or per_subject were on, apply the matching "
       "TypeScript changes noted above before shipping.")
 ''')
 

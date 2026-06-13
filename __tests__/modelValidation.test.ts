@@ -13,8 +13,8 @@ import { FEATURE_NAMES } from '@/services/ai/types';
 // Model File Validation
 // ============================================================
 
-const MODEL_PATH = path.resolve(__dirname, '../assets/ml/stress_model.json');
-const METADATA_PATH = path.resolve(__dirname, '../assets/ml/model_metadata.json');
+const MODEL_PATH = path.resolve(__dirname, '../assets/ml/stress/stress_model.json');
+const METADATA_PATH = path.resolve(__dirname, '../assets/ml/stress/model_metadata.json');
 
 describe('Model File Structure', () => {
   let model: any;

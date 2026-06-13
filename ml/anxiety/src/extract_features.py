@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 from scipy import io as sio
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Reuse the stress component's shared HRV feature extractor (ml/stress/src/features.py)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'stress')))
 from src.features import extract_features, FEATURE_ORDER
 
 DATA_DIR       = os.path.abspath(os.path.join(os.path.dirname(__file__), '../data'))
