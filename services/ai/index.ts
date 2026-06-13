@@ -30,6 +30,9 @@ export type { AnomalyFlag } from './baseline';
 export { analyzeSleepSession, computeSleepTrend } from './sleepAnalysis';
 export type { SleepTrend } from './sleepAnalysis';
 
+// ML sleep stage classification
+export { loadSleepModel, isSleepModelLoaded, classifySleepStages } from './sleepStageModel';
+
 // Voice check-in
 export { analyzeCheckin, analyzeCheckinLocal, computeCheckinTrend } from './voiceAnalysis';
 export type { CheckinTrend } from './voiceAnalysis';

@@ -138,20 +138,23 @@ describe('End-to-End Pipeline: Stressed State', () => {
 describe('Sleep Pipeline', () => {
   test('poor sleep analysis triggers sleep recommendations', () => {
     const start = new Date('2026-03-07T02:00:00').getTime();
-    const end = new Date('2026-03-07T05:30:00').getTime();
+    // Severely poor session: 60 min onset, minimal deep/REM, only 100 min total sleep
+    const end = new Date('2026-03-07T04:40:00').getTime();
 
     const session: RawSleepSession = {
       startTime: start, endTime: end,
       stages: [
-        { startTime: start, endTime: start + 120 * 60000, stage: 'awake' },
-        { startTime: start + 120 * 60000, endTime: start + 180 * 60000, stage: 'light' },
-        { startTime: start + 180 * 60000, endTime: start + 210 * 60000, stage: 'awake' },
+        { startTime: start, endTime: start + 60 * 60000, stage: 'awake' },        // 60 min onset
+        { startTime: start + 60 * 60000, endTime: start + 120 * 60000, stage: 'light' },
+        { startTime: start + 120 * 60000, endTime: start + 125 * 60000, stage: 'deep' }, // 5 min deep
+        { startTime: start + 125 * 60000, endTime: start + 130 * 60000, stage: 'rem' },  // 5 min rem
+        { startTime: start + 130 * 60000, endTime: start + 160 * 60000, stage: 'light' },
       ],
       source: 'test',
     };
 
     const sleep = analyzeSleepSession(session);
-    expect(sleep.qualityScore).toBeLessThan(70);
+    expect(sleep.qualityScore).toBeLessThan(50);
 
     const stress = { timestamp: Date.now(), stressScore: 45, stressLevel: 'moderate' as const, confidence: 0.8, topContributors: [] };
     const recs = generateRecommendations(stress, null, sleep, null, null);
