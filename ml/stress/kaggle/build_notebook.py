@@ -147,9 +147,14 @@ CALIBRATE_THRESHOLD = True
 THRESHOLD_OBJECTIVE = "prior"
 
 WINDOW_SEC     = 60          # 60-s windows match the watch's polling cadence
-USE_MORPHOLOGY = True        # add 8 PPG pulse-shape features (raw-PPG only)
+# Feature set for the EXPORTED model. SHAP-guided feature reduction showed the
+# frequency-domain block and PPG morphology add ZERO held-out AUC (0.858 at 14 == 29
+# features), so both are off by default -> a lean 14-feature model (9 time-domain + 5
+# nonlinear HRV). Set these True to compute/analyse the full 21/29-feature set instead.
+USE_FREQ_DOMAIN = False      # 7 frequency-domain HRV features (Welch PSD) -- inert, dropped
+USE_MORPHOLOGY  = False      # 8 PPG pulse-shape features (raw-PPG only) -- inert, dropped
 NORMALIZATION  = "per_subject"   # "global" | "per_subject"
-VERSION        = "1.1.0"     # bumps the exported model version
+VERSION        = "1.2.0"     # bumps the exported model version (lean 14-feature set)
 SEED           = 42
 N_JOBS         = -1          # use all cores for feature extraction
 
@@ -662,10 +667,16 @@ from sklearn.metrics import (accuracy_score,f1_score,roc_auc_score,precision_sco
                              recall_score,classification_report,confusion_matrix)
 from xgboost import XGBClassifier
 
-HRV21=["meanRR","sdnn","rmssd","pnn50","pnn20","hrMean","hrStd","hrRange","cvRR",
-       "vlfPower","lfPower","hfPower","lfHfRatio","totalPower","lfNorm","hfNorm",
-       "sd1","sd2","sd1sd2Ratio","sampleEntropy","dfaAlpha1"]
-FEATS = HRV21 + (MORPHOLOGY_FEATURES if USE_MORPHOLOGY else [])
+TIME_FEATS      = ["meanRR","sdnn","rmssd","pnn50","pnn20","hrMean","hrStd","hrRange","cvRR"]
+FREQ_FEATS      = ["vlfPower","lfPower","hfPower","lfHfRatio","totalPower","lfNorm","hfNorm"]
+NONLINEAR_FEATS = ["sd1","sd2","sd1sd2Ratio","sampleEntropy","dfaAlpha1"]
+HRV21 = TIME_FEATS + FREQ_FEATS + NONLINEAR_FEATS          # full 21 HRV set (analysis/back-compat)
+# Exported/trained feature set: time + (freq) + nonlinear + (morphology), per the flags.
+# Default lean = 14 (USE_FREQ_DOMAIN=False, USE_MORPHOLOGY=False) -> SHAP-reduction optimum.
+FEATS = (TIME_FEATS
+         + (FREQ_FEATS if USE_FREQ_DOMAIN else [])
+         + NONLINEAR_FEATS
+         + (MORPHOLOGY_FEATURES if USE_MORPHOLOGY else []))
 
 def per_subject_z(d, cols, g="subject", eps=1e-8):
     o=d.copy(); gp=o.groupby(g)[cols]
