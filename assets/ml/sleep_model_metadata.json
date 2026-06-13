@@ -1,0 +1,61 @@
+{
+  "version": "3.2.0",
+  "modelType": "tcn_bilstm_seq2seq_hr_actigraphy",
+  "task": "sleep_stage_classification_4class",
+  "trainData": "BIDSleep (Apple Watch)",
+  "testData": "Walch/Sleep-Accel (held-out)",
+  "numClasses": 4,
+  "stageNames": [
+    "Wake",
+    "Light",
+    "Deep",
+    "REM"
+  ],
+  "stageMap": {
+    "0": "awake",
+    "1": "light",
+    "2": "deep",
+    "3": "rem"
+  },
+  "input": {
+    "features": {
+      "shape": [
+        "batch",
+        "seq_len",
+        12
+      ],
+      "names": [
+        "hr_mean",
+        "hr_std",
+        "hr_min",
+        "hr_max",
+        "hr_range",
+        "hr_succdiff_std",
+        "hr_delta_prev",
+        "act_count",
+        "immobility_frac",
+        "act_max",
+        "act_std",
+        "time_of_night"
+      ],
+      "epochSeconds": 30,
+      "recommendedSeqLen": 41,
+      "normalization": "per_night_median_mad_per_feature"
+    }
+  },
+  "output": {
+    "logits": {
+      "shape": [
+        "batch",
+        "seq_len",
+        4
+      ],
+      "note": "argmax last dim \u2192 stageMap"
+    }
+  },
+  "test": {
+    "walch_macroF1": 0.5869430437018809,
+    "walch_weightedF1": 0.6337617752985295,
+    "walch_kappa": 0.4432132601442954
+  }
+}
