@@ -4,7 +4,8 @@ import pickle
 import numpy as np
 import pandas as pd
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Reuse the stress component's shared HRV feature extractor (ml/stress/src/features.py)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'stress')))
 from src.features import extract_features, FEATURE_ORDER
 
 EXAM_DIR = os.path.abspath(os.path.join(

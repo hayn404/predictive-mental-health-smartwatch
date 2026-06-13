@@ -8,7 +8,7 @@ import numpy as np
 from pathlib import Path
 
 NB = Path(__file__).parent / "seren_stress_kaggle.ipynb"
-WESAD_LOCAL = Path(__file__).parents[1] / "data" / "WESAD"
+WESAD_LOCAL = Path(__file__).parents[2] / "data" / "WESAD"
 OUT = Path(tempfile.mkdtemp())
 SIPD_FAKE = Path(tempfile.mkdtemp()) / "sipd"
 

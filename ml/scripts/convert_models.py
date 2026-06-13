@@ -23,13 +23,14 @@ from sklearn.preprocessing import StandardScaler
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 BASE = Path(__file__).resolve().parent.parent   # ml/
-MODELS = BASE / 'models'
-DATA   = BASE / 'data'
+STRESS_MODELS  = BASE / 'stress'  / 'models'
+ANXIETY_MODELS = BASE / 'anxiety' / 'models'
+DATA   = BASE / 'anxiety' / 'data'
 
-STRESS_IN   = MODELS / 'stress_model.json'
-ANXIETY_IN  = MODELS / 'anxiety_model.json'
-STRESS_OUT  = MODELS / 'stress_model.json'          # overwrite in-place
-ANXIETY_OUT = MODELS / 'anxiety_model_ts.json'      # new TS-compatible file
+STRESS_IN   = STRESS_MODELS  / 'stress_model.json'
+ANXIETY_IN  = ANXIETY_MODELS / 'anxiety_model.json'
+STRESS_OUT  = STRESS_MODELS  / 'stress_model.json'      # overwrite in-place
+ANXIETY_OUT = ANXIETY_MODELS / 'anxiety_model_ts.json'  # new TS-compatible file
 
 ASSETS_ML = BASE.parent / 'assets' / 'ml'
 ASSETS_ML.mkdir(parents=True, exist_ok=True)
@@ -75,9 +76,10 @@ sm['trees'] = fixed_trees
 with open(STRESS_OUT, 'w') as f:
     json.dump(sm, f, separators=(',', ':'))   # compact — keeps file small
 import shutil
-shutil.copy(STRESS_OUT, ASSETS_ML / 'stress_model.json')
+(ASSETS_ML / 'stress').mkdir(parents=True, exist_ok=True)
+shutil.copy(STRESS_OUT, ASSETS_ML / 'stress' / 'stress_model.json')
 print(f'  Saved {STRESS_OUT} ({STRESS_OUT.stat().st_size / 1024:.0f} KB)')
-print(f'  Copied → assets/ml/stress_model.json')
+print(f'  Copied → assets/ml/stress/stress_model.json')
 
 # ─── 2. Convert anxiety_model.json → anxiety_model_ts.json ───────────────────
 
@@ -164,7 +166,8 @@ export = {
 
 with open(ANXIETY_OUT, 'w') as f:
     json.dump(export, f, separators=(',', ':'))
-shutil.copy(ANXIETY_OUT, ASSETS_ML / 'anxiety_model.json')
+(ASSETS_ML / 'anxiety').mkdir(parents=True, exist_ok=True)
+shutil.copy(ANXIETY_OUT, ASSETS_ML / 'anxiety' / 'anxiety_model.json')
 print(f'  Saved {ANXIETY_OUT} ({ANXIETY_OUT.stat().st_size / 1024:.0f} KB)')
 print(f'  Copied → assets/ml/anxiety_model.json')
 

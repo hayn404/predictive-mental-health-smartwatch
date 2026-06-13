@@ -43,6 +43,7 @@ ml/.pytest_cache/
 ml/src/__pycache__/
 ml/tests/__pycache__/
 ml/data/
+ml/**/models/*.joblib
 ml/models/*.joblib
 __pycache__/
 *.pyc

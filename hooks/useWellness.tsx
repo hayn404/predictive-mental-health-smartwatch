@@ -309,9 +309,9 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   async function loadModels() {
     try {
       // Import JSON directly — Metro bundler handles JSON requires natively
-      const stressModelJson = require('@/assets/ml/stress_model.json');
-      const anxietyModelJson = require('@/assets/ml/anxiety_model.json');
-      const focusModelJson = require('@/assets/ml/focus_model.json');
+      const stressModelJson = require('@/assets/ml/stress/stress_model.json');
+      const anxietyModelJson = require('@/assets/ml/anxiety/anxiety_model.json');
+      const focusModelJson = require('@/assets/ml/focus/focus_model.json');
       loadModel(stressModelJson);
       loadAnxietyModel(anxietyModelJson);
       loadFocusModel(focusModelJson);
@@ -323,7 +323,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
   async function loadSleepStageModel() {
     try {
-      const modelAsset = Asset.fromModule(require('@/assets/ml/sleep_stage_model.onnx'));
+      const modelAsset = Asset.fromModule(require('@/assets/ml/sleep/sleep_stage_model.onnx'));
       await modelAsset.downloadAsync();
       if (modelAsset.localUri) {
         await loadV32SleepModel(modelAsset.localUri);
