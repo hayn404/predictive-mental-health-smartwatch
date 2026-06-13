@@ -27,9 +27,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ============================================================
 FROM base AS test
 
-COPY src/ /app/src/
-COPY tests/ /app/tests/
-COPY config/ /app/config/
+# Sources live under ml/stress/ after the per-component reorg; keep the in-image
+# layout (/app/src, /app/tests, /app/config) so PYTHONPATH and imports are unchanged.
+COPY stress/src/ /app/src/
+COPY stress/tests/ /app/tests/
+COPY stress/config/ /app/config/
 
 WORKDIR /app
 RUN python -m pytest tests/ -v --tb=short
@@ -39,8 +41,8 @@ RUN python -m pytest tests/ -v --tb=short
 # ============================================================
 FROM base AS train
 
-COPY src/ /app/src/
-COPY config/ /app/config/
+COPY stress/src/ /app/src/
+COPY stress/config/ /app/config/
 
 # Create output directories
 RUN mkdir -p /app/models /app/data /app/assets/ml
