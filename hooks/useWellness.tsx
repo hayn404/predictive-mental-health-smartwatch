@@ -26,8 +26,6 @@ import React, {
   ReactNode,
 } from 'react';
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import { Asset } from 'expo-asset';
 import * as SQLite from 'expo-sqlite';
 
 import {
@@ -710,7 +708,9 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         featureHistory.current = featureHistory.current.slice(-4032);
       }
 
-      const stressPred = predictStress(featureVector, baseline);
+      // S1: pass the user's recent windows so the model can normalize per-subject
+      // (its headline accuracy lever) instead of the global training scaler.
+      const stressPred = predictStress(featureVector, baseline, featureHistory.current);
       setStress(stressPred);
 
       const anxietyPred = predictAnxiety(featureVector, baseline);
