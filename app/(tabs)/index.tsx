@@ -15,6 +15,7 @@ import { useWellness } from '@/hooks/useWellness';
 import { useAuth } from '@/hooks/useAuth';
 import { StressGauge } from '@/components/ui/StressGauge';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { Hypnogram } from '@/components/ui/Hypnogram';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -114,6 +115,19 @@ export default function HomeScreen() {
             </View>
           </GlassCard>
         </View>
+
+        {/* Last Night's Sleep — hypnogram (stage timeline + on-device model confidence) */}
+        <GlassCard variant="default" style={styles.sleepCard}>
+          <View style={styles.sleepCardHeader}>
+            <Text style={styles.metricLabel}>Last Night&apos;s Sleep</Text>
+            {lastSleep && (
+              <Text style={styles.metricSubInfo}>
+                {`${Math.floor(lastSleep.totalSleepMin / 60)}h ${lastSleep.totalSleepMin % 60}m · ${Math.round(lastSleep.qualityScore)}%`}
+              </Text>
+            )}
+          </View>
+          <Hypnogram stages={lastSleep?.stages} confidence={lastSleep?.mlConfidence} />
+        </GlassCard>
 
         {/* Sunlight Exposure Card */}
         <GlassCard variant="default" style={styles.sunlightCard}>
@@ -480,6 +494,19 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
     backgroundColor: Colors.warmWhite,
     borderWidth: 0,
+    marginBottom: Spacing.sm,
+  },
+  sleepCard: {
+    padding: Spacing.lg,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.warmWhite,
+    borderWidth: 0,
+    marginBottom: Spacing.sm,
+  },
+  sleepCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: Spacing.sm,
   },
   sunlightLeft: {

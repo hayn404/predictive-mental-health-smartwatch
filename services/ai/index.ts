@@ -30,8 +30,8 @@ export type { AnomalyFlag } from './baseline';
 export { analyzeSleepSession, computeSleepTrend } from './sleepAnalysis';
 export type { SleepTrend } from './sleepAnalysis';
 
-// ML sleep stage classification
-export { loadSleepModel, isSleepModelLoaded, classifySleepStages } from './sleepStageModel';
+// ML sleep stage classification (v3.2 on-device TFLite)
+export { loadV32SleepModel, isV32SleepModelLoaded, runV32Inference } from './sleepStageModel';
 
 // Voice check-in
 export { analyzeCheckin, analyzeCheckinLocal, computeCheckinTrend } from './voiceAnalysis';

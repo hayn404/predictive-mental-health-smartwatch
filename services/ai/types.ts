@@ -283,6 +283,12 @@ export interface SleepAnalysis {
   qualityScore: number;         // 0-100
   recoveryScore: number;        // 0-100 (HRV-based)
   consistencyScore: number;     // 0-100 (vs usual schedule)
+
+  // Per-night stage timeline (for the hypnogram). Optional: DB-loaded rows may omit it.
+  stages?: RawSleepStage[];
+  // Mean per-epoch confidence when stages came from the on-device ML model (0-1); absent
+  // for Health Connect / heuristic stages.
+  mlConfidence?: number;
 }
 
 // ----------------------------------------------------------
