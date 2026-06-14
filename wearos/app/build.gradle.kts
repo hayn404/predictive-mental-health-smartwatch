@@ -17,9 +17,23 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        // Sign with the SAME key as the phone app (android/app/debug.keystore) so the Wear OS
+        // Data Layer pairs — the Wearable API matches companion apps by signing certificate.
+        // Test-only key; for store releases use a real keystore + Play app-signing.
+        create("shared") {
+            storeFile = rootProject.file("../android/app/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("shared")
+            // Minify off for test builds so proguard can't strip Wearable/Compose classes.
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
