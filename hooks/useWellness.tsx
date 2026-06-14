@@ -323,12 +323,9 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
   async function loadSleepStageModel() {
     try {
-      const modelAsset = Asset.fromModule(require('@/assets/ml/sleep/sleep_stage_model.onnx'));
-      await modelAsset.downloadAsync();
-      if (modelAsset.localUri) {
-        await loadV32SleepModel(modelAsset.localUri);
-        setSleepModelReady(isV32SleepModelLoaded());
-      }
+      // TFLite model is required inside loadV32SleepModel (react-native-fast-tflite).
+      await loadV32SleepModel();
+      setSleepModelReady(isV32SleepModelLoaded());
     } catch (e) {
       console.warn('[Seren] v3.2 sleep model not available (will use Health Connect stages):', e);
       setSleepModelReady(false);

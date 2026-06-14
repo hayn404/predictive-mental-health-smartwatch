@@ -20,6 +20,7 @@
  *     → flatten + argmax + map to SleepStageType[]
  */
 
+import type { TensorflowModel } from 'react-native-fast-tflite';
 import { SleepStageType, RawSleepStage } from './types';
 
 // ────────────────────────────────────────────────────────────────
@@ -80,32 +81,39 @@ export interface V32SleepOutput {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Lazy ONNX session
+// Lazy TFLite model (react-native-fast-tflite — New-Architecture compatible)
 // ────────────────────────────────────────────────────────────────
 
-let onnxSession: any = null;
+let tfliteModel: TensorflowModel | null = null;
 let modelMetaVersion = 'v3.2.0';
 
 /**
- * Load the ONNX model. `modelUri` must resolve to a file path the native
- * ONNX runtime can read (resolveAssetSource(...).uri or a downloaded path).
+ * Load the on-device TFLite sleep model. The .tflite was converted from the original
+ * ONNX (onnx2tf with Erf/GELU replaced by native ops, so no Flex/Select-TF ops).
+ * Parity vs ONNX: argmax-identical, max-abs-diff ~1e-6.
+ * Tensor layout: input [1, FEAT(12), SEQ(41)] (feature-major), output [1, SEQ(41), CLASSES(4)].
  */
-export async function loadV32SleepModel(modelUri: string): Promise<boolean> {
+export async function loadV32SleepModel(): Promise<boolean> {
   try {
-    // @ts-ignore - onnxruntime-react-native installed via expo prebuild
-    const ORT = await import('onnxruntime-react-native');
-    onnxSession = await ORT.InferenceSession.create(modelUri);
-    console.log('[Seren] v3.2 sleep model loaded:', modelUri);
+    // Dynamic import keeps the native module out of the JS bundle until needed
+    // (and out of unit tests that import this file for the pure helpers).
+    const { loadTensorflowModel } = await import('react-native-fast-tflite');
+    // delegates: [] -> default CPU delegate (model uses native ops, no GPU needed)
+    tfliteModel = await loadTensorflowModel(
+      require('@/assets/ml/sleep/sleep_stage_model.tflite'),
+      [],
+    );
+    console.log('[Seren] v3.2 sleep model (TFLite) loaded');
     return true;
   } catch (e) {
     console.warn('[Seren] v3.2 sleep model load failed:', e);
-    onnxSession = null;
+    tfliteModel = null;
     return false;
   }
 }
 
 export function isV32SleepModelLoaded(): boolean {
-  return onnxSession !== null;
+  return tfliteModel !== null;
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -204,15 +212,12 @@ function argmax(probs: number[]): number {
 export async function runV32Inference(
   rawEpochs: RawEpochFeatures[],
 ): Promise<V32SleepOutput | null> {
-  if (!onnxSession) return null;
+  if (!tfliteModel) return null;
   const N = rawEpochs.length;
   if (N < V32_SEQ_LEN) {
     console.warn(`[Seren] v3.2 inference: need >= ${V32_SEQ_LEN} epochs, got ${N}`);
     return null;
   }
-
-  // @ts-ignore - onnxruntime-react-native installed via expo prebuild
-  const ORT = await import('onnxruntime-react-native');
 
   // 1. Assemble + normalize the whole night
   const raw = assembleFeatureMatrix(rawEpochs);
@@ -227,16 +232,16 @@ export async function runV32Inference(
     const end = Math.min(start + V32_SEQ_LEN, N);
     const winLen = end - start;
     // Pad the last (possibly short) window by repeating the final epoch.
-    // The padding's outputs are discarded; this keeps shape stable.
-    const winInput = new Float32Array(V32_SEQ_LEN * F);
+    // TFLite input layout is [1, F, SEQ] (feature-major) -> index = f*SEQ + i.
+    const winInput = new Float32Array(F * V32_SEQ_LEN);
     for (let i = 0; i < V32_SEQ_LEN; i++) {
       const src = (i < winLen ? start + i : end - 1) * F;
-      for (let f = 0; f < F; f++) winInput[i * F + f] = norm[src + f];
+      for (let f = 0; f < F; f++) winInput[f * V32_SEQ_LEN + i] = norm[src + f];
     }
 
-    const tensor = new ORT.Tensor('float32', winInput, [1, V32_SEQ_LEN, F]);
-    const out = await onnxSession.run({ features: tensor });
-    const logits = out.logits.data as Float32Array; // [1, SEQ_LEN, C]
+    // fast-tflite takes/returns ArrayBuffer[]. Output [1, SEQ, C] row-major -> logits[i*C + c].
+    const outputs = tfliteModel.runSync([winInput.buffer as ArrayBuffer]);
+    const logits = new Float32Array(outputs[0]);
 
     for (let i = 0; i < winLen; i++) {
       const offset = i * C;
