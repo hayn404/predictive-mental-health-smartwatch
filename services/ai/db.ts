@@ -42,6 +42,8 @@ export interface SQLiteDatabase {
   runAsync(sql: string, ...params: any[]): Promise<{ lastInsertRowId: number; changes: number }>;
   getFirstAsync<T>(sql: string, ...params: any[]): Promise<T | null>;
   getAllAsync<T>(sql: string, ...params: any[]): Promise<T[]>;
+  // expo-sqlite provides this; optional so a lightweight mock can omit it.
+  withTransactionAsync?(task: () => Promise<void>): Promise<void>;
 }
 
 // ============================================================
@@ -187,6 +189,24 @@ let db: SQLiteDatabase | null = null;
 export async function initDatabase(database: SQLiteDatabase): Promise<void> {
   db = database;
   await db.execAsync(CREATE_TABLES);
+  await runMigrations(database);
+}
+
+/**
+ * Version the schema via PRAGMA user_version so future changes apply once, in order.
+ * (CREATE TABLE IF NOT EXISTS handles fresh installs; this stamps the version and is the
+ * hook point for stepwise migrations.) Wrapped so a mock DB without PRAGMA can't break init.
+ */
+async function runMigrations(database: SQLiteDatabase): Promise<void> {
+  try {
+    const row = await database.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+    const current = row?.user_version ?? 0;
+    if (current >= SCHEMA_VERSION) return;
+    // Future: apply migrations for versions (current, SCHEMA_VERSION] here.
+    await database.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  } catch (e) {
+    console.warn('[Seren] DB migration check skipped:', e);
+  }
 }
 
 /**
@@ -215,8 +235,16 @@ export async function insertBiometricSample(sample: Omit<DBBiometricSample, 'id'
 export async function insertBiometricSamplesBatch(
   samples: Omit<DBBiometricSample, 'id'>[],
 ): Promise<void> {
-  for (const sample of samples) {
-    await insertBiometricSample(sample);
+  if (samples.length === 0) return;
+  const database = getDb();
+  const run = async () => {
+    for (const sample of samples) await insertBiometricSample(sample);
+  };
+  // I4: wrap the batch in a single transaction (atomic + far faster than N autocommits).
+  if (database.withTransactionAsync) {
+    await database.withTransactionAsync(run);
+  } else {
+    await run();
   }
 }
 
