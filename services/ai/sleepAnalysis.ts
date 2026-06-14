@@ -116,6 +116,7 @@ export function analyzeSleepSession(
     date,
     sessionStart: session.startTime,
     sessionEnd: session.endTime,
+    stages,  // per-night stage timeline for the hypnogram
 
     totalInBedMin: Math.round(totalInBedMin),
     totalSleepMin: Math.round(totalSleepMin),

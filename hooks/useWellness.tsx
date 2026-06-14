@@ -356,8 +356,14 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
           baseline,
           r.output.mlStages,
         );
-        setLastSleep(analysis);
-        sleepHistory.current.push(analysis);
+        // L4: mean per-epoch confidence from the on-device model -> surfaced in the UI.
+        const epochs = r.output.epochs;
+        const mlConfidence = epochs.length
+          ? epochs.reduce((s, e) => s + e.confidence, 0) / epochs.length
+          : undefined;
+        const enriched = { ...analysis, mlConfidence };
+        setLastSleep(enriched);
+        sleepHistory.current.push(enriched);
         setSleepTrend(computeSleepTrend(sleepHistory.current));
         if (dbReadyRef.current) {
           insertSleepSession(analysis).catch(() => {});
