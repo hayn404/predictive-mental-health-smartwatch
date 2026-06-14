@@ -24,6 +24,7 @@ import {
   RawEpochFeatures,
   V32SleepOutput,
   runV32Inference,
+  isV32SleepModelLoaded,
 } from './sleepStageModel';
 
 const MAGIC = 0x314e5253;  // 'SRN1' little-endian
@@ -56,10 +57,24 @@ export async function processPendingSessions(): Promise<SessionResult[]> {
     const markerInfo = await FileSystem.getInfoAsync(finalMarker);
     if (!markerInfo.exists) continue; // session still being captured
 
+    // L5: if the model isn't loaded yet, KEEP the session and retry on a later open —
+    // don't consume + delete the raw overnight data with no model available to process it.
+    if (!isV32SleepModelLoaded()) {
+      results.push({
+        captureStartMs: parseInt(sessionName, 10),
+        epochsReceived: 0,
+        output: null,
+        skipped: 'model_not_loaded',
+      });
+      continue;
+    }
+
     const result = await processSession(sessionDir, parseInt(sessionName, 10));
     results.push(result);
 
-    // Clean up — comment this out during debugging so you can re-run.
+    // Delete only now that the model has had its chance: a null result here means the data
+    // is genuinely empty/too-short (won't improve on retry). Transient "model not loaded"
+    // is handled above, so raw data is never lost on a retryable failure.
     try {
       await FileSystem.deleteAsync(sessionDir, { idempotent: true });
     } catch (e) {
