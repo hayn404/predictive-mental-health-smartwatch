@@ -59,6 +59,7 @@ import { computeBaseline, shouldRecomputeBaseline, detectAnomalies, AnomalyFlag 
 import { analyzeSleepSession, computeSleepTrend, SleepTrend } from '@/services/ai/sleepAnalysis';
 import { loadV32SleepModel, isV32SleepModelLoaded } from '@/services/ai/sleepStageModel';
 import { processPendingSessions } from '@/services/ai/sleepReceiver';
+import { recordStressPrediction } from '@/services/observability/modelMonitor';
 import { analyzeCheckin, computeCheckinTrend, CheckinTrend } from '@/services/ai/voiceAnalysis';
 import { generateRecommendations } from '@/services/ai/recommendations';
 import {
@@ -718,6 +719,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       // (its headline accuracy lever) instead of the global training scaler.
       const stressPred = predictStress(featureVector, baseline, featureHistory.current);
       setStress(stressPred);
+      recordStressPrediction(stressPred); // S6/L8: runtime model-health/drift monitoring
 
       const anxietyPred = predictAnxiety(featureVector, baseline);
       setAnxiety(anxietyPred);

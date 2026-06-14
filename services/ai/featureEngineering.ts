@@ -242,25 +242,30 @@ function computeSampleEntropy(data: number[], m: number, rFactor: number): numbe
   const r = rFactor * std(data);
   if (r === 0) return 0;
 
-  const countMatches = (templateLen: number): number => {
-    let count = 0;
-    for (let i = 0; i < N - templateLen; i++) {
-      for (let j = i + 1; j < N - templateLen; j++) {
-        let match = true;
-        for (let k = 0; k < templateLen; k++) {
-          if (Math.abs(data[i + k] - data[j + k]) >= r) {
-            match = false;
-            break;
-          }
+  // S5: single-pass count of m- and (m+1)-length template matches. Every (m+1) match is
+  // also an m match, so we extend the m-match check by one element instead of running the
+  // O(N^2) pair loop twice. Output is identical to the previous two-pass version; the
+  // index limits (limB / limA) reproduce its exact ranges.
+  let A = 0; // (m+1)-length matches
+  let B = 0; // m-length matches
+  const limB = N - m;
+  const limA = N - m - 1;
+  for (let i = 0; i < limB; i++) {
+    for (let j = i + 1; j < limB; j++) {
+      let mMatch = true;
+      for (let k = 0; k < m; k++) {
+        if (Math.abs(data[i + k] - data[j + k]) >= r) {
+          mMatch = false;
+          break;
         }
-        if (match) count++;
+      }
+      if (!mMatch) continue;
+      B++;
+      if (i < limA && j < limA && Math.abs(data[i + m] - data[j + m]) < r) {
+        A++;
       }
     }
-    return count;
-  };
-
-  const B = countMatches(m);
-  const A = countMatches(m + 1);
+  }
 
   if (B === 0 || A === 0) return 0;
   return -Math.log(A / B);
