@@ -22,6 +22,7 @@ import {
   PersonalBaseline,
   FEATURE_NAMES,
 } from './types';
+import { computePerUserNorm, type PerUserNorm } from './perUserNorm';
 
 // ============================================================
 // XGBoost Model Types (matches JSON export format)
@@ -147,14 +148,18 @@ function xgboostPredict(model: XGBoostModel, features: Record<string, number>): 
  */
 function normalizeFeatures(
   features: BiometricFeatureVector,
-  model: XGBoostModel
+  model: XGBoostModel,
+  perUserNorm?: PerUserNorm | null,
 ): Record<string, number> {
   const normalized: Record<string, number> = {};
 
   model.features.forEach((name, i) => {
     const raw = (features as any)[name] ?? 0;
-    const mean = model.normalization.mean[name] ?? 0;
-    const stdDev = model.normalization.std[name] ?? 1;
+    // S1: prefer the user's own (per-subject) mean/std where available, else the model's
+    // global training scaler. Per-subject z-norm is the model's headline generalization lever.
+    const useUser = !!perUserNorm && name in perUserNorm.mean && (perUserNorm.std[name] ?? 0) > 0;
+    const mean = useUser ? perUserNorm!.mean[name] : (model.normalization.mean[name] ?? 0);
+    const stdDev = useUser ? perUserNorm!.std[name] : (model.normalization.std[name] ?? 1);
 
     let value: number;
     // Handle activityType encoding: sedentary=0, walking=1, active=2, sleeping=3
@@ -190,6 +195,7 @@ function normalizeFeatures(
 export function predictStress(
   features: BiometricFeatureVector,
   baseline?: PersonalBaseline | null,
+  recentWindows?: BiometricFeatureVector[] | null,
 ): StressPrediction {
   if (!cachedModel) {
     // Fallback: rule-based estimation if model isn't loaded
@@ -204,8 +210,10 @@ export function predictStress(
     return { ...fb, confidence: Math.min(fb.confidence, 0.3) };
   }
 
-  // Normalize features using training scaler
-  const normalizedFeatures = normalizeFeatures(features, cachedModel);
+  // S1: per-subject normalization from the user's recent windows (falls back to the
+  // model's global scaler per-feature until enough personal history exists).
+  const perUserNorm = computePerUserNorm(recentWindows ?? null, cachedModel.features);
+  const normalizedFeatures = normalizeFeatures(features, cachedModel, perUserNorm);
 
   // Run XGBoost inference
   const probability = xgboostPredict(cachedModel, normalizedFeatures);
