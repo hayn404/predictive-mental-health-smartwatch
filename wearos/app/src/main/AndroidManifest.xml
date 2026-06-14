@@ -18,6 +18,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -54,6 +55,12 @@
             android:name=".sleep.SleepCaptureService"
             android:exported="false"
             android:foregroundServiceType="health" />
+
+        <!-- Environment capture foreground service (ambient light + GPS → batches → phone) -->
+        <service
+            android:name=".env.EnvironmentCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <!-- TODO: Wear Tile Service (implement when Tiles Material 3 is integrated) -->
 

@@ -1,6 +1,8 @@
 package com.seren.watch.presentation.screens
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -43,10 +45,19 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import androidx.wear.compose.material.Vignette
 import androidx.wear.compose.material.VignettePosition
+import com.seren.watch.env.EnvironmentCaptureService
 import com.seren.watch.presentation.WellnessViewModel
 import com.seren.watch.presentation.components.MetricChip
 import com.seren.watch.presentation.components.StressArc
 import com.seren.watch.presentation.theme.SerenColors
+
+/** Start the on-watch ambient-light + GPS capture service (auto-started once permitted). */
+private fun startEnvironmentCapture(context: Context) {
+    ContextCompat.startForegroundService(
+        context,
+        Intent(context, EnvironmentCaptureService::class.java),
+    )
+}
 
 /**
  * Main dashboard screen — the first thing users see on the watch.
@@ -67,30 +78,37 @@ fun DashboardScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
 
-    // Request body sensor permission
+    // Request body-sensor + location permissions (location powers on-watch env capture)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val allGranted = permissions.values.all { it }
-        if (allGranted) {
+        if (permissions[Manifest.permission.BODY_SENSORS] == true) {
             viewModel.onPermissionGranted()
         } else {
             viewModel.useMockData()
         }
+        val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (locationGranted) startEnvironmentCapture(context)
     }
 
     LaunchedEffect(Unit) {
-        val hasPermission = ContextCompat.checkSelfPermission(
+        val hasBody = ContextCompat.checkSelfPermission(
             context, Manifest.permission.BODY_SENSORS
         ) == PackageManager.PERMISSION_GRANTED
+        val hasLocation = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
-        if (hasPermission) {
-            viewModel.onPermissionGranted()
-        } else {
+        if (hasBody) viewModel.onPermissionGranted()
+        if (hasLocation) startEnvironmentCapture(context)
+
+        if (!hasBody || !hasLocation) {
             permissionLauncher.launch(
                 arrayOf(
                     Manifest.permission.BODY_SENSORS,
                     Manifest.permission.ACTIVITY_RECOGNITION,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
                 )
             )
         }
