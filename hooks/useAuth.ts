@@ -5,11 +5,11 @@
  */
 
 // @ts-nocheck
-import { useNeonAuth } from '@/template/auth/neon/hook';
+import { useAuth as useSupabaseAuth } from '@/template/auth/supabase/hook';
 import type { AuthUser } from '@/template/auth/types';
 
 export function useAuth() {
-  const auth = useNeonAuth();
+  const auth = useSupabaseAuth();
   return {
     ...auth,
     isAuthenticated: !!auth.user,
