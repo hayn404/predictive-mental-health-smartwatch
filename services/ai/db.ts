@@ -137,6 +137,14 @@ const CREATE_TABLES = `
     cluster_index INTEGER DEFAULT -1
   );
 
+  CREATE TABLE IF NOT EXISTS location_points (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER NOT NULL,
+    latitude REAL NOT NULL,
+    longitude REAL NOT NULL,
+    accuracy REAL DEFAULT -1
+  );
+
   CREATE TABLE IF NOT EXISTS location_diversity (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT NOT NULL UNIQUE,
@@ -171,6 +179,7 @@ const CREATE_TABLES = `
   CREATE INDEX IF NOT EXISTS idx_sleep_date ON sleep_sessions(date);
   CREATE INDEX IF NOT EXISTS idx_checkins_ts ON checkins(timestamp);
   CREATE INDEX IF NOT EXISTS idx_location_visits_ts ON location_visits(timestamp);
+  CREATE INDEX IF NOT EXISTS idx_location_points_ts ON location_points(timestamp);
   CREATE INDEX IF NOT EXISTS idx_sunlight_ts ON sunlight_samples(timestamp);
   CREATE INDEX IF NOT EXISTS idx_sunlight_daily_date ON sunlight_daily(date);
   CREATE INDEX IF NOT EXISTS idx_location_div_date ON location_diversity(date);
@@ -456,6 +465,36 @@ export async function insertLocationVisit(visit: LocationVisit): Promise<number>
     visit.latitude, visit.longitude, visit.label, visit.clusterIndex,
   );
   return result.lastInsertRowId;
+}
+
+/** Delete visits whose arrival time falls in [startTime, endTime] (for idempotent re-derivation). */
+export async function deleteLocationVisitsInRange(startTime: number, endTime: number): Promise<void> {
+  await getDb().runAsync(
+    'DELETE FROM location_visits WHERE timestamp BETWEEN ? AND ?',
+    startTime, endTime,
+  );
+}
+
+/** Raw GPS fixes streamed from the watch — segmented into visits on recompute. */
+export async function insertLocationPoint(
+  point: { timestamp: number; latitude: number; longitude: number; accuracy: number },
+): Promise<number> {
+  const result = await getDb().runAsync(
+    `INSERT INTO location_points (timestamp, latitude, longitude, accuracy) VALUES (?, ?, ?, ?)`,
+    point.timestamp, point.latitude, point.longitude, point.accuracy,
+  );
+  return result.lastInsertRowId;
+}
+
+export async function getLocationPoints(
+  startTime: number,
+  endTime: number,
+): Promise<{ timestamp: number; latitude: number; longitude: number; accuracy: number }[]> {
+  const rows = await getDb().getAllAsync<{ timestamp: number; latitude: number; longitude: number; accuracy: number }>(
+    'SELECT timestamp, latitude, longitude, accuracy FROM location_points WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp',
+    startTime, endTime,
+  );
+  return rows;
 }
 
 export async function getLocationVisits(startTime: number, endTime: number): Promise<LocationVisit[]> {

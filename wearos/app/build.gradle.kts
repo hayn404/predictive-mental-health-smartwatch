@@ -84,6 +84,9 @@ dependencies {
     // Wear Data Layer (phone <-> watch sync)
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
 
+    // Fused location provider (on-watch GPS for location-diversity capture)
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
     // Tiles API (quick-glance tile on watch face)
     implementation("androidx.wear.tiles:tiles:1.4.1")
     implementation("androidx.wear.tiles:tiles-material:1.4.1")

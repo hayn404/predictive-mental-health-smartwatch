@@ -211,6 +211,80 @@ export function calculateDiversityScore(
 }
 
 // ============================================================
+// Dwell Segmentation (raw GPS points → visits)
+// ============================================================
+
+export interface RawLocationPoint {
+  timestamp: number;
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+}
+
+/**
+ * Segment a chronological list of raw GPS fixes (streamed from the watch) into
+ * dwell "visits". A new visit begins whenever a fix is more than
+ * CLUSTER_RADIUS_METERS from the running centroid of the current visit. Each
+ * visit records arrival (first fix) and departure (last fix) so downstream
+ * clustering can weight home/work by dwell time. A stable clusterIndex is
+ * assigned per place so transition counting works.
+ */
+export function segmentVisitsFromPoints(points: RawLocationPoint[]): LocationVisit[] {
+  if (points.length === 0) return [];
+  const sorted = [...points].sort((a, b) => a.timestamp - b.timestamp);
+  const visits: LocationVisit[] = [];
+  const places: { lat: number; lon: number }[] = [];
+
+  const placeIndexFor = (lat: number, lon: number): number => {
+    for (let i = 0; i < places.length; i++) {
+      if (haversineDistance(lat, lon, places[i].lat, places[i].lon) < CLUSTER_RADIUS_METERS) return i;
+    }
+    places.push({ lat, lon });
+    return places.length - 1;
+  };
+
+  let cLat = sorted[0].latitude;
+  let cLon = sorted[0].longitude;
+  let count = 1;
+  let arrival = sorted[0].timestamp;
+  let departure = sorted[0].timestamp;
+
+  const flush = () => {
+    visits.push({
+      id: `v_${arrival}`,
+      timestamp: arrival,
+      departureTime: departure,
+      latitude: cLat,
+      longitude: cLon,
+      label: 'unknown',
+      clusterIndex: placeIndexFor(cLat, cLon),
+    });
+  };
+
+  for (let i = 1; i < sorted.length; i++) {
+    const p = sorted[i];
+    const dist = haversineDistance(p.latitude, p.longitude, cLat, cLon);
+    if (dist < CLUSTER_RADIUS_METERS) {
+      // Same place — extend dwell, update running centroid.
+      cLat = (cLat * count + p.latitude) / (count + 1);
+      cLon = (cLon * count + p.longitude) / (count + 1);
+      count++;
+      departure = p.timestamp;
+    } else {
+      // Moved — close current visit and start a new one.
+      flush();
+      cLat = p.latitude;
+      cLon = p.longitude;
+      count = 1;
+      arrival = p.timestamp;
+      departure = p.timestamp;
+    }
+  }
+  flush();
+  return visits;
+}
+
+// ============================================================
 // Location Permission & Tracking
 // ============================================================
 

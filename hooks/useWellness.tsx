@@ -59,6 +59,7 @@ import { computeBaseline, shouldRecomputeBaseline, detectAnomalies, AnomalyFlag 
 import { analyzeSleepSession, computeSleepTrend, SleepTrend } from '@/services/ai/sleepAnalysis';
 import { loadV32SleepModel, isV32SleepModelLoaded } from '@/services/ai/sleepStageModel';
 import { processPendingSessions } from '@/services/ai/sleepReceiver';
+import { processPendingEnv } from '@/services/ai/envReceiver';
 import { recordStressPrediction } from '@/services/observability/modelMonitor';
 import { analyzeCheckin, computeCheckinTrend, CheckinTrend } from '@/services/ai/voiceAnalysis';
 import { generateRecommendations } from '@/services/ai/recommendations';
@@ -491,77 +492,57 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
   async function initLocationAndSunlight() {
     try {
-      // Load persisted data first
+      // Drain any ambient-light + GPS batches the watch delivered, then recompute
+      // today's summaries so the reads below pick up real watch data over mock.
+      if (dbReadyRef.current) {
+        try {
+          const env = await processPendingEnv();
+          if (env.lightSamples || env.locationPoints) {
+            console.log(`[Seren] env from watch: ${env.lightSamples} light, ${env.locationPoints} GPS`);
+          }
+        } catch (e) {
+          console.warn('[Seren] processPendingEnv failed:', e);
+        }
+      }
+
+      // Load persisted data (already recomputed above from watch batches when present).
+      let haveLocation = false;
+      let haveSunlight = false;
       if (dbReadyRef.current) {
         const savedLocation = await getTodayLocationDiversity();
-        if (savedLocation) setLocationDiversity(savedLocation);
+        if (savedLocation) { setLocationDiversity(savedLocation); haveLocation = true; }
 
         const savedSunlight = await getTodaySunlightDaily();
-        if (savedSunlight) setSunlightExposure(savedSunlight);
+        if (savedSunlight) { setSunlightExposure(savedSunlight); haveSunlight = true; }
+
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
         const locationHistory = await getLocationDiversityHistory(7);
         if (locationHistory.length > 0) {
-          const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-          const mapped = locationHistory.map(h => {
-            const d = new Date(h.date);
-            const dayIdx = (d.getDay() + 6) % 7;
+          setWeeklyLocationDiversity(locationHistory.map(h => {
+            const dayIdx = (new Date(h.date).getDay() + 6) % 7;
             return { date: days[dayIdx], value: Math.round(h.diversityScore) };
-          });
-          setWeeklyLocationDiversity(mapped);
+          }));
         }
 
         const sunlightHistory = await getSunlightDailyHistory(7);
         if (sunlightHistory.length > 0) {
-          const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-          const mapped = sunlightHistory.map(h => {
-            const d = new Date(h.date);
-            const dayIdx = (d.getDay() + 6) % 7;
+          setWeeklySunlight(sunlightHistory.map(h => {
+            const dayIdx = (new Date(h.date).getDay() + 6) % 7;
             return { date: days[dayIdx], value: Math.round(h.totalOutdoorMinutes) };
-          });
-          setWeeklySunlight(mapped);
+          }));
         }
       }
 
-      // Use mock data for development (Expo Go / web)
-      if (!locationDiversity) {
+      // Fall back to mock only when the watch hasn't delivered real data yet
+      // (sunlight + location are sourced from the watch via processPendingEnv).
+      if (!haveLocation) {
         setLocationDiversity(getMockLocationDiversity());
         setWeeklyLocationDiversity(getMockWeeklyLocationDiversity());
       }
-      if (!sunlightExposure) {
+      if (!haveSunlight) {
         setSunlightExposure(getMockSunlightExposure());
         setWeeklySunlight(getMockWeeklySunlight());
-      }
-
-      // Try to start real sensors (will silently no-op if unavailable)
-      try {
-        const lightAvailable = await isLightSensorAvailable();
-        if (lightAvailable) {
-          const unsubscribe = await startSunlightMonitoring((reading) => {
-            if (dbReadyRef.current) {
-              insertSunlightSample(reading).catch(() => {});
-            }
-            // Update exposure summary periodically
-            setSunlightExposure(prev => {
-              if (!prev) return prev;
-              const newOutdoorMin = prev.totalOutdoorMinutes + (reading.isOutdoors ? 1 : 0);
-              const hour = new Date().getHours();
-              const inWindow = hour >= 10 && hour < 15;
-              const newOptimalMin = prev.optimalWindowMinutes + (reading.isOutdoors && inWindow ? 1 : 0);
-              const updated: SunlightExposureSummary = {
-                ...prev,
-                totalOutdoorMinutes: newOutdoorMin,
-                optimalWindowMinutes: newOptimalMin,
-                peakLux: Math.max(prev.peakLux, reading.luxValue),
-                goalProgress: Math.min(1, newOutdoorMin / prev.goalMinutes),
-                isVitaminDWindow: inWindow,
-              };
-              if (dbReadyRef.current) upsertSunlightDaily(updated).catch(() => {});
-              return updated;
-            });
-          });
-        }
-      } catch (e) {
-        console.warn('[Seren] Sensor init failed (using mock):', e);
       }
     } catch (e) {
       console.warn('[Seren] Location/Sunlight init failed:', e);
