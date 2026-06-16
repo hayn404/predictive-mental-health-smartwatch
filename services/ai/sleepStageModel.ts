@@ -21,6 +21,7 @@
  */
 
 import type { TensorflowModel } from 'react-native-fast-tflite';
+import Constants from 'expo-constants';
 import { SleepStageType, RawSleepStage } from './types';
 
 // ────────────────────────────────────────────────────────────────
@@ -94,6 +95,13 @@ let modelMetaVersion = 'v3.2.0';
  * Tensor layout: input [1, FEAT(12), SEQ(41)] (feature-major), output [1, SEQ(41), CLASSES(4)].
  */
 export async function loadV32SleepModel(): Promise<boolean> {
+  // react-native-fast-tflite depends on NitroModules (a native module) which throws on
+  // import in Expo Go. Skip it there so it never errors — sleep falls back to Health
+  // Connect's pre-classified stages. It loads normally in a dev/production build.
+  if (Constants.appOwnership === 'expo') {
+    console.log('[Seren] v3.2 sleep model skipped in Expo Go (needs a dev build); using Health Connect stages.');
+    return false;
+  }
   try {
     // Dynamic import keeps the native module out of the JS bundle until needed
     // (and out of unit tests that import this file for the pure helpers).

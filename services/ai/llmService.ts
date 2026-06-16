@@ -58,7 +58,7 @@ const DEFAULT_CONFIGS: Record<string, Omit<LLMConfig, 'apiKey'>> = {
   openrouter: {
     provider: 'openrouter',
     baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'meta-llama/llama-3.1-8b-instruct:free',
+    model: 'mistralai/mistral-7b-instruct:free',
     maxTokens: 512,
     temperature: 0.7,
   },
