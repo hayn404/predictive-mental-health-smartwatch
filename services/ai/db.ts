@@ -166,6 +166,11 @@ const CREATE_TABLES = `
     goal_minutes REAL DEFAULT 30
   );
 
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+
   CREATE INDEX IF NOT EXISTS idx_biometric_ts ON biometric_samples(timestamp);
   CREATE INDEX IF NOT EXISTS idx_features_ts ON feature_windows(timestamp);
   CREATE INDEX IF NOT EXISTS idx_sleep_date ON sleep_sessions(date);
@@ -377,6 +382,19 @@ export async function getLatestBaseline(userId: string): Promise<PersonalBaselin
     userId,
   );
   return row ? JSON.parse(row.data_json) : null;
+}
+
+// ============================================================
+// App settings (key-value, e.g. the user's chronological age)
+// ============================================================
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  await getDb().runAsync('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', key, value);
+}
+
+export async function getSetting(key: string): Promise<string | null> {
+  const row = await getDb().getFirstAsync<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', key);
+  return row ? row.value : null;
 }
 
 // ============================================================
