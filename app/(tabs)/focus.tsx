@@ -19,11 +19,11 @@ const TAB_BAR_HEIGHT = 82;
 export default function FocusScreen() {
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
-  const { focus } = useWellness();
+  const { focus, heartRate, hrv, features } = useWellness();
 
-  // Static card height: screen minus every fixed element (header, tagline, features bar, gaps, padding)
-  // header≈50  tagline≈60  featuresBar≈122  gaps(12×3)=36  paddingTop=insets.top+16  paddingBottom=insets.bottom+82
-  const cardHeight = screenH - (insets.top + 16) - (insets.bottom + TAB_BAR_HEIGHT) - 50 - 60 - 122 - 36;
+  // Static card height: screen minus every fixed element (header, tagline, features bar, caveat, gaps, padding)
+  // header≈50  tagline≈60  featuresBar≈122  caveat≈26  gaps(12×4)=48  paddingTop=insets.top+16  paddingBottom=insets.bottom+82
+  const cardHeight = screenH - (insets.top + 16) - (insets.bottom + TAB_BAR_HEIGHT) - 50 - 60 - 122 - 26 - 48;
 
   const [lastTip, setLastTip]       = useState<string | null>(null);
   const [gaugeZoneH, setGaugeZoneH] = useState(0);
@@ -34,16 +34,24 @@ export default function FocusScreen() {
 
   const displayTip = focus.groqTips[0] ?? lastTip ?? (
     focus.focusScore >= 75
-      ? 'Your signals look settled — a good moment to begin'
-      : 'A few slow breaths before you start can bring your system into balance'
+      ? "You're strongly engaged — your body is locked into the task"
+      : focus.focusScore >= 50
+        ? 'Moderate engagement — steady enough to keep working'
+        : 'Engagement looks low — a short reset or a clear next step can help you re-engage'
   );
 
-  const hrEntry   = focus.elevatedFeatures.find(f => f.feature === 'hrMean');
-  const hrvEntry  = focus.elevatedFeatures.find(f => f.feature === 'rmssd');
-  const tempEntry = focus.elevatedFeatures.find(f => f.feature === 'tempMean');
-  const balEntry  = focus.elevatedFeatures.find(f => f.feature === 'lfHfRatio');
+  // Live watch signals come straight from the wellness context (same source the
+  // stress/home screen uses). elevatedFeatures only flags which ones are out of
+  // range — used here purely to tint a signal amber when it's straining.
+  const isElevated = (feature: string) =>
+    focus.elevatedFeatures.some(f => f.feature === feature);
 
-  const sigColor = (e: typeof hrEntry) => e ? '#F59E0B' : '#35e27e';
+  const hrValue   = heartRate > 0 ? heartRate.toFixed(0) : '—';
+  const hrvValue  = hrv > 0 ? hrv.toFixed(0) : '—';
+  const tempValue = features && features.tempMean > 0 ? features.tempMean.toFixed(1) : '—';
+  const balValue  = features && features.lfHfRatio > 0 ? features.lfHfRatio.toFixed(1) : '—';
+
+  const sigColor = (elevated: boolean) => elevated ? '#F59E0B' : '#35e27e';
   const accent   = getFocusColor(focus.focusLevel);
 
   // Gauge fills the measured zone minus a small breathing margin
@@ -69,16 +77,16 @@ export default function FocusScreen() {
 
       {/* ── Tagline ── */}
       <Text style={styles.tagline}>
-        Your anti-distraction companion — before and during exams or deep work.
-        I read your body&apos;s live signals so you stay sharp throughout.
+        Your live cognitive-engagement companion for exams and deep work.
+        I read your body&apos;s signals to show how locked-in you are, right now.
       </Text>
 
-      {/* ── Readiness Card — fills all remaining space ── */}
+      {/* ── Engagement Card — fills all remaining space ── */}
       <View style={[styles.card, { borderColor: accent + '35', height: cardHeight }]}>
 
         <View style={styles.cardLabelRow}>
           <View style={[styles.dot, { backgroundColor: accent }]} />
-          <Text style={styles.cardLabel}>COGNITIVE READINESS</Text>
+          <Text style={styles.cardLabel}>COGNITIVE ENGAGEMENT</Text>
         </View>
 
         <View
@@ -115,15 +123,21 @@ export default function FocusScreen() {
           </View>
         </View>
         <View style={styles.featuresRow}>
-          <FeatureItem icon="favorite"   label="Heart Rate" value={hrEntry?.value.toFixed(0)  ?? '—'} unit="bpm" color={sigColor(hrEntry)} />
+          <FeatureItem icon="favorite"   label="Heart Rate" value={hrValue}   unit="bpm" color={sigColor(isElevated('hrMean'))} />
           <View style={styles.featureDivider} />
-          <FeatureItem icon="show-chart" label="HRV"        value={hrvEntry?.value.toFixed(0)  ?? '—'} unit="ms"  color={sigColor(hrvEntry)} />
+          <FeatureItem icon="show-chart" label="HRV"        value={hrvValue}  unit="ms"  color={sigColor(isElevated('rmssd'))} />
           <View style={styles.featureDivider} />
-          <FeatureItem icon="thermostat" label="Temp"       value={tempEntry?.value.toFixed(1) ?? '—'} unit="°C"  color={sigColor(tempEntry)} />
+          <FeatureItem icon="thermostat" label="Temp"       value={tempValue} unit="°C"  color={sigColor(isElevated('tempMean'))} />
           <View style={styles.featureDivider} />
-          <FeatureItem icon="device-hub" label="Balance"    value={balEntry?.value.toFixed(1)  ?? '—'} unit=""    color={sigColor(balEntry)} />
+          <FeatureItem icon="device-hub" label="Balance"    value={balValue}  unit=""    color={sigColor(isElevated('lfHfRatio'))} />
         </View>
       </View>
+
+      {/* ── Caveat (honest scope disclosure) ── */}
+      <Text style={styles.caveat}>
+        On-device estimate of cognitive engagement, trained on lab cognitive-load data
+        (CogWear, Galaxy Watch4). A wellness signal — not a clinical or diagnostic measure.
+      </Text>
 
     </View>
   );
@@ -155,6 +169,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 12,
     backgroundColor: Colors.cream,
+  },
+
+  /* Caveat footnote */
+  caveat: {
+    fontSize: 9,
+    lineHeight: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    opacity: 0.7,
+    paddingHorizontal: 8,
   },
 
   /* Header */

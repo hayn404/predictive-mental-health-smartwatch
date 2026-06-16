@@ -1,0 +1,17 @@
+{
+  "best_params": {
+    "max_depth": 4,
+    "learning_rate": 0.07794049199293865,
+    "n_estimators": 346,
+    "subsample": 0.8822216723546903,
+    "colsample_bytree": 0.6651180697442644,
+    "reg_lambda": 1.0063837683464962,
+    "reg_alpha": 0.0,
+    "gamma": 0.13818687008004,
+    "min_child_weight": 1
+  },
+  "cogwear_loso_auc": 0.8392557022809124,
+  "maus_external_auc": 0.8096440596440596,
+  "baseline_loso_auc": 0.8181272509003601,
+  "baseline_maus_auc": 0.83008658008658
+}
