@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  TextInput,
   Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -21,7 +22,8 @@ import { useAuth } from '@/hooks/useAuth';
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { watchConnected, lastSyncTime, deleteAllData, exportData, requestHealthConnectPermissions, healthConnectAvailable } = useWellness();
+  const { watchConnected, lastSyncTime, deleteAllData, exportData, requestHealthConnectPermissions, healthConnectAvailable,
+    chronologicalAge, setChronologicalAge } = useWellness();
   const { showAlert } = useAlert();
   const { user, logout } = useAuth();
 
@@ -41,6 +43,15 @@ export default function SettingsScreen() {
         },
       ]
     );
+  };
+
+  const [ageInput, setAgeInput] = useState(chronologicalAge != null ? String(chronologicalAge) : '');
+  useEffect(() => {
+    if (chronologicalAge != null) setAgeInput(String(chronologicalAge));
+  }, [chronologicalAge]);
+  const commitAge = () => {
+    const a = parseInt(ageInput, 10);
+    setChronologicalAge(isNaN(a) || a < 5 || a > 120 ? null : a);
   };
 
   const [onDevice, setOnDevice] = useState(true);
@@ -172,6 +183,32 @@ export default function SettingsScreen() {
             destructive
             onPress={handleLogout}
           />
+        </GlassCard>
+
+        {/* Profile */}
+        <Text style={styles.sectionLabel}>Profile</Text>
+        <GlassCard variant="default" style={styles.settingsGroup}>
+          <View style={styles.settingRow}>
+            <View style={[styles.settingIcon, { backgroundColor: Colors.violet + '18' }]}>
+              <MaterialIcons name="cake" size={18} color={Colors.violet} />
+            </View>
+            <View style={styles.settingText}>
+              <Text style={styles.settingLabel}>Your age</Text>
+              <Text style={styles.settingSubLabel}>Used for your physiological age-gap</Text>
+            </View>
+            <TextInput
+              style={styles.ageInput}
+              value={ageInput}
+              onChangeText={setAgeInput}
+              onEndEditing={commitAge}
+              onSubmitEditing={commitAge}
+              keyboardType="number-pad"
+              maxLength={3}
+              placeholder="--"
+              placeholderTextColor={Colors.textMuted}
+              returnKeyType="done"
+            />
+          </View>
         </GlassCard>
 
         {/* Connected Device */}
@@ -463,6 +500,18 @@ const styles = StyleSheet.create({
   settingText: {
     flex: 1,
     gap: 2,
+  },
+  ageInput: {
+    minWidth: 52,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.warmGray300,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
   settingLabel: {
     fontSize: FontSize.sm,

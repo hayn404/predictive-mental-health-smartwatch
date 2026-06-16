@@ -22,6 +22,9 @@ jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(),
   watchPositionAsync: jest.fn(),
 }));
+// sleepStageModel (pulled in via sleepReceiver) imports expo-constants for the
+// Expo Go guard — stub it so the module loads under ts-jest.
+jest.mock('expo-constants', () => ({ __esModule: true, default: { appOwnership: null } }));
 
 import { decodeLight, decodeLocation } from '@/services/ai/envReceiver';
 import { segmentVisitsFromPoints } from '@/services/ai/locationTracking';

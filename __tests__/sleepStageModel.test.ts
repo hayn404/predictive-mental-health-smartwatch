@@ -17,6 +17,8 @@ jest.mock('expo-file-system/legacy', () => ({
   deleteAsync: jest.fn(),
   documentDirectory: '/tmp/',
 }));
+// sleepStageModel imports expo-constants for the Expo Go tflite guard; stub it.
+jest.mock('expo-constants', () => ({ __esModule: true, default: { appOwnership: null } }));
 
 import {
   robustNormalizePerNight,
