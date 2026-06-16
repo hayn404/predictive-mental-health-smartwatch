@@ -52,7 +52,9 @@ import {
 import {
   loadFocusModel,
   predictFocus,
+  getFocusLevel,
 } from '@/services/ai/focusModel';
+import { loadBioAgeModel, predictBioAge, type BioAgePrediction } from '@/services/ai/bioAgeModel';
 import { getFocusTips } from '@/services/ai/focusRecommendations';
 import { extractFeatures } from '@/services/ai/featureEngineering';
 import { computeBaseline, shouldRecomputeBaseline, detectAnomalies, AnomalyFlag } from '@/services/ai/baseline';
@@ -79,6 +81,8 @@ import {
   getRecentFeatureWindows,
   deleteAllData as dbDeleteAllData,
   cleanupOldData,
+  getSetting,
+  setSetting,
   upsertLocationDiversity,
   getTodayLocationDiversity,
   getLocationDiversityHistory,
@@ -122,6 +126,9 @@ interface WellnessContextValue {
   stress: StressPrediction;
   anxiety: AnxietyPrediction;
   focus: FocusPrediction;
+  bioAge: BioAgePrediction | null;
+  chronologicalAge: number | null;
+  setChronologicalAge: (age: number | null) => void;
   lastSleep: SleepAnalysis | null;
   sleepTrend: SleepTrend;
   baseline: PersonalBaseline | null;
@@ -232,6 +239,9 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const [stress, setStress] = useState<StressPrediction>(DEFAULT_STRESS);
   const [anxiety, setAnxiety] = useState<AnxietyPrediction>(DEFAULT_ANXIETY);
   const [focus, setFocus] = useState<FocusPrediction>(DEFAULT_FOCUS);
+  const [bioAge, setBioAge] = useState<BioAgePrediction | null>(null);
+  const [chronologicalAge, setChronoState] = useState<number | null>(25);
+  const chronoRef = useRef<number | null>(25);
   const [lastSleep, setLastSleep] = useState<SleepAnalysis | null>(null);
   const [sleepTrend, setSleepTrend] = useState<SleepTrend>(DEFAULT_SLEEP_TREND);
   const [baseline, setBaseline] = useState<PersonalBaseline | null>(null);
@@ -276,6 +286,11 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const sleepHistory = useRef<SleepAnalysis[]>([]);
   const dbReadyRef = useRef(false);
   const lastFocusScoreRef = useRef(0);
+  // Rolling buffer of recent focus scores for temporal smoothing (sustained-state read).
+  // ~24 cycles × 5s ≈ 2 min, matching the window aggregation that lifts LOSO AUC 0.82→0.95.
+  const focusScoreBufferRef = useRef<number[]>([]);
+  // Tracks where biometrics are coming from: a real watch (Health Connect) or mock data.
+  const dataSourceRef = useRef<'watch' | 'mock'>('mock');
 
   // ============================================================
   // Initialization
@@ -314,6 +329,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       loadModel(stressModelJson);
       loadAnxietyModel(anxietyModelJson);
       loadFocusModel(focusModelJson);
+      loadBioAgeModel(require('@/assets/ml/bioage/bioage_model.json'));
       setModelLoaded(true);
     } catch (e) {
       console.warn('[Seren] Failed to load ML models:', e);
@@ -432,6 +448,13 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         featureHistory.current = savedFeatures;
       }
 
+      // Restore the user's chronological age (for the bio-age age-gap), if set.
+      const savedAge = await getSetting('chronological_age');
+      if (savedAge != null && savedAge !== '') {
+        const a = parseInt(savedAge, 10);
+        if (!isNaN(a)) { chronoRef.current = a; setChronoState(a); }
+      }
+
       await cleanupOldData();
       updateInsightsChartData();
     } catch (e) {
@@ -444,6 +467,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       if (Platform.OS !== 'android') {
         console.log('[Seren] Not Android — using mock Health Connect');
         healthService.current = createMockHealthConnectService();
+        dataSourceRef.current = 'mock';
         setWatchConnected(true);
         return;
       }
@@ -460,22 +484,26 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         const hasPerms = await realService.hasPermissions();
 
         if (hasPerms) {
-          console.log('[Seren] Health Connect permissions granted — using REAL data');
+          console.log('[Seren] Health Connect permissions granted — using REAL watch data');
           healthService.current = realService;
+          dataSourceRef.current = 'watch';
           setWatchConnected(true);
         } else {
           console.log('[Seren] Permissions not yet granted — using mock data. Grant via Settings.');
           healthService.current = createMockHealthConnectService();
+          dataSourceRef.current = 'mock';
           setWatchConnected(false);
         }
       } else {
         console.log('[Seren] Health Connect not available — using mock data');
         healthService.current = createMockHealthConnectService();
+        dataSourceRef.current = 'mock';
         setWatchConnected(true);
       }
     } catch (e) {
       console.warn('[Seren] Health Connect init failed, using mock:', e);
       healthService.current = createMockHealthConnectService();
+      dataSourceRef.current = 'mock';
       setWatchConnected(true);
     }
   }
@@ -724,17 +752,54 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       const anxietyPred = predictAnxiety(featureVector, baseline);
       setAnxiety(anxietyPred);
 
-      const focusPred = predictFocus(featureVector);
-      setFocus({ ...focusPred, groqLoading: false });
+      // Focus: trained CogWear model + per-user normalization (pass recent windows,
+      // same history the stress model uses for its per-subject scaler).
+      const focusPred = predictFocus(featureVector, featureHistory.current);
 
-      // Only trigger Groq if focus score changed by 7+ points (significant change)
-      const scoreDiff = Math.abs(focusPred.focusScore - lastFocusScoreRef.current);
+      // Temporal smoothing: focus/engagement is a sustained state, not a 5-second blip.
+      // Average the model's recent scores (~2 min) — the deployment analogue of the
+      // per-session window aggregation that raised LOSO AUC 0.82→0.95.
+      const buf = focusScoreBufferRef.current;
+      buf.push(focusPred.focusScore);
+      if (buf.length > 24) buf.shift();
+      const smoothedScore = Math.round(buf.reduce((s, v) => s + v, 0) / buf.length);
+      const focusSmoothed = {
+        ...focusPred,
+        focusScore: smoothedScore,
+        focusLevel: getFocusLevel(smoothedScore),
+      };
+      setFocus({ ...focusSmoothed, groqLoading: false });
+
+      // Biological age: a stable trait → aggregate the user's recent windows (median),
+      // global-normalize, predict physiological age, derive the age gap vs chronological age.
+      const bioAgePred = predictBioAge(featureHistory.current, chronoRef.current);
+      setBioAge(bioAgePred);
+      console.log(
+        `[Seren][BioAge] ready=${bioAgePred.ready} predictedAge=${bioAgePred.predictedAge} ` +
+        `chrono=${bioAgePred.chronologicalAge} gap=${bioAgePred.ageGap} ` +
+        `windows=${featureHistory.current.length} conf=${bioAgePred.confidence.toFixed(2)}`,
+      );
+
+      // [Focus] live-signal trace — shows the watch data feeding the focus model each cycle.
+      // source=watch → real Health Connect data; source=mock → synthetic (no watch connected).
+      const normMode = featureHistory.current.length >= 20 ? 'per-user' : 'cold-start/global';
+      console.log(
+        `[Seren][Focus] source=${dataSourceRef.current} norm=${normMode} ` +
+        `HR=${featureVector.hrMean.toFixed(0)}bpm ` +
+        `HRV=${featureVector.rmssd.toFixed(0)}ms ` +
+        `lf/hf=${featureVector.lfHfRatio.toFixed(2)} ` +
+        `→ raw=${focusPred.focusScore} smoothed=${smoothedScore} (${focusSmoothed.focusLevel}) ` +
+        `elevated=[${focusPred.elevatedFeatures.map(f => f.feature).join(',') || 'none'}]`,
+      );
+
+      // Only trigger Groq if the (smoothed) focus score changed by 7+ points.
+      const scoreDiff = Math.abs(smoothedScore - lastFocusScoreRef.current);
       if (scoreDiff >= 7) {
-        console.log(`[Seren] Focus score changed ${scoreDiff.toFixed(0)} points (${lastFocusScoreRef.current} → ${focusPred.focusScore}) - Triggering Groq`);
-        lastFocusScoreRef.current = focusPred.focusScore;
+        console.log(`[Seren] Focus score changed ${scoreDiff.toFixed(0)} points (${lastFocusScoreRef.current} → ${smoothedScore}) - Triggering Groq`);
+        lastFocusScoreRef.current = smoothedScore;
         setFocus(prev => ({ ...prev, groqLoading: true }));
 
-        getFocusTips(focusPred.focusScore, focusPred.focusLevel, focusPred.elevatedFeatures, false)
+        getFocusTips(smoothedScore, focusSmoothed.focusLevel, focusPred.elevatedFeatures, false)
           .then(tips => {
             console.log(`[Seren] Groq tips received: ${tips.length} tips`);
             setFocus(prev => ({ ...prev, groqTips: tips, groqLoading: false }));
@@ -872,6 +937,15 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
   const toggleLive = useCallback(() => setIsLive((v: boolean) => !v), []);
 
+  const setChronologicalAge = useCallback((age: number | null) => {
+    chronoRef.current = age;
+    setChronoState(age);
+    setBioAge(predictBioAge(featureHistory.current, age));
+    if (dbReadyRef.current) {
+      setSetting('chronological_age', age == null ? '' : String(age)).catch(() => {});
+    }
+  }, []);
+
   const refreshData = useCallback(async () => {
     await runInferenceCycle();
     await fetchSleepData();
@@ -880,6 +954,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const deleteAllUserData = useCallback(async () => {
     featureHistory.current = [];
     sleepHistory.current = [];
+    focusScoreBufferRef.current = [];
     setBaseline(null);
     setCheckinHistory([]);
     setLastCheckin(null);
@@ -913,6 +988,8 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       const granted = await realService.requestPermissions();
       if (granted) {
         healthService.current = realService;
+        dataSourceRef.current = 'watch';
+        console.log('[Seren] Health Connect permissions granted via Settings — switching to REAL watch data');
         setWatchConnected(true);
         setHealthConnectAvailable(true);
       }
@@ -927,7 +1004,8 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   // ============================================================
 
   const value: WellnessContextValue = {
-    stress, anxiety, focus, lastSleep, sleepTrend, baseline, anomalies,
+    stress, anxiety, focus, bioAge, chronologicalAge, setChronologicalAge,
+    lastSleep, sleepTrend, baseline, anomalies,
     recommendations, features, heartRate, hrv,
     locationDiversity, sunlightExposure,
     lastCheckin, checkinHistory, checkinTrend, performCheckin,
