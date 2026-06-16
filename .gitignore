@@ -52,3 +52,11 @@ wearos/.gradle/
 wearos/.idea/
 android/
 .env
+
+# Large ML training data (download from the dataset sources; see model cards)
+ml/*/data/
+# Generated native iOS project (Expo managed workflow)
+/ios/
+# Logs and Office temp/lock files
+ml/**/*.log
+~$*
