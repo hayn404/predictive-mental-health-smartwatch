@@ -13,13 +13,19 @@ import { getLLMConfig, getLLMApiKey } from './llmService';
 
 async function callGroq(prompt: string): Promise<string> {
   const apiKey = getLLMApiKey();
+  const cfg = getLLMConfig();
 
   if (!apiKey) {
-    console.warn('[Seren] No Groq API key configured - using fallback tips');
+    console.warn('[Seren] No LLM API key configured - using fallback tips');
     throw new Error('No API key');
   }
 
-  console.log('[Seren] Calling Groq API (model: llama-3.1-8b-instant, max_tokens: 300)');
+  // Use whatever provider is configured (Groq, OpenRouter, OpenAI, …) — NOT a hardcoded
+  // Groq endpoint. Sending an OpenRouter key to api.groq.com returns 401.
+  const baseUrl = cfg?.baseUrl ?? 'https://api.groq.com/openai/v1';
+  const model = cfg?.model ?? 'llama-3.1-8b-instant';
+
+  console.log(`[Seren] Calling LLM for focus tips (provider: ${cfg?.provider ?? 'groq'}, model: ${model})`);
   const startTime = Date.now();
 
   // Create abort controller with 10 second timeout
@@ -27,14 +33,20 @@ async function callGroq(prompt: string): Promise<string> {
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    };
+    if (cfg?.provider === 'openrouter') {
+      headers['HTTP-Referer'] = 'https://seren-app.com';
+      headers['X-Title'] = 'Seren';
+    }
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model,
         messages: [
           { role: 'system', content: FOCUS_SYSTEM_PROMPT },
           { role: 'user', content: prompt },

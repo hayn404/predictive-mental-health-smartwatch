@@ -16,11 +16,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { StressGauge } from '@/components/ui/StressGauge';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Hypnogram } from '@/components/ui/Hypnogram';
+import { ageGapMessage } from '@/services/ai/bioAgeModel';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { stress, anxiety, lastSleep, heartRate, recommendations, sunlightExposure, locationDiversity } = useWellness();
+  const { stress, anxiety, lastSleep, heartRate, recommendations, sunlightExposure, locationDiversity, bioAge } = useWellness();
   const { user } = useAuth();
   const displayName = user?.username || user?.email?.split('@')[0] || 'there';
 
@@ -77,6 +78,35 @@ export default function HomeScreen() {
             <MaterialIcons name="verified-user" size={12} color="#35e27e" />
             <Text style={styles.onDevicePillText}>ON-DEVICE PROCESSING</Text>
           </View>
+        </View>
+
+        {/* Physiological Age (HRV-derived) */}
+        <View style={styles.bioAgeCard}>
+          <View style={styles.bioAgeHeaderRow}>
+            <MaterialIcons name="favorite" size={16} color="#E24B4A" />
+            <Text style={styles.bioAgeTitle}>Physiological Age</Text>
+            <View style={styles.bioAgePill}>
+              <Text style={styles.bioAgePillText}>HRV</Text>
+            </View>
+          </View>
+          {bioAge?.ready ? (
+            <>
+              <View style={styles.bioAgeValueRow}>
+                <Text style={styles.bioAgeValue}>{bioAge.predictedAge}</Text>
+                <Text style={styles.bioAgeUnit}>yrs</Text>
+                {bioAge.ageGap != null && (
+                  <View style={[styles.bioAgeGapBadge, { backgroundColor: bioAge.ageGap > 0 ? '#FCEBEB' : '#E1F5EE' }]}>
+                    <Text style={[styles.bioAgeGapText, { color: bioAge.ageGap > 0 ? '#A32D2D' : '#0F6E56' }]}>
+                      {bioAge.ageGap > 0 ? `+${bioAge.ageGap}` : `${bioAge.ageGap}`} vs your age
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.bioAgeMsg}>{ageGapMessage(bioAge)}</Text>
+            </>
+          ) : (
+            <Text style={styles.bioAgeMsg}>Gathering signal to estimate your physiological age…</Text>
+          )}
         </View>
 
         {/* Secondary Metrics Grid */}
@@ -246,6 +276,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  bioAgeCard: {
+    backgroundColor: Colors.warmWhite,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#F0E9E0',
+  },
+  bioAgeHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  bioAgeTitle: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, flex: 1 },
+  bioAgePill: { backgroundColor: '#F1EFE8', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  bioAgePillText: { fontSize: 10, fontWeight: '600', color: Colors.textMuted, letterSpacing: 0.5 },
+  bioAgeValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  bioAgeValue: { fontSize: 36, fontWeight: '700', color: Colors.textPrimary },
+  bioAgeUnit: { fontSize: 14, color: Colors.textMuted, marginRight: 8 },
+  bioAgeGapBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'center' },
+  bioAgeGapText: { fontSize: 11, fontWeight: '600' },
+  bioAgeMsg: { fontSize: 12.5, color: Colors.textSecondary, lineHeight: 18, marginTop: 6 },
   scroll: {
     flex: 1,
   },
