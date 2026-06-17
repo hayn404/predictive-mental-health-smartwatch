@@ -12,16 +12,24 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/constants/theme';
 import { Image } from 'expo-image';
+import { Audio } from 'expo-av';
 import { requestNotificationPermissions } from '@/utils/notifications';
+import { useWellness } from '@/hooks/useWellness';
 
 export default function PrivacyScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { requestHealthConnectPermissions } = useWellness();
     const [onDevice, setOnDevice] = useState(true);
+    const [busy, setBusy] = useState(false);
 
     const handleFinish = async () => {
-        // Request notification permissions explicitly before continuing
-        await requestNotificationPermissions();
+        // Actually request the runtime permissions the models need, in sequence.
+        setBusy(true);
+        try { await requestNotificationPermissions(); } catch { /* user can grant later */ }
+        try { await requestHealthConnectPermissions(); } catch { /* HC may be absent */ }
+        try { await Audio.requestPermissionsAsync(); } catch { /* mic for voice check-ins */ }
+        setBusy(false);
         router.replace('/(tabs)');
     };
 
@@ -108,11 +116,12 @@ export default function PrivacyScreen() {
                 </View>
 
                 <TouchableOpacity
-                    style={styles.startButton}
+                    style={[styles.startButton, busy && { opacity: 0.6 }]}
                     onPress={handleFinish}
+                    disabled={busy}
                 >
                     <Text style={styles.startButtonText}>
-                        Start Your Journey
+                        {busy ? 'Requesting permissions…' : 'Start Your Journey'}
                     </Text>
                     <MaterialIcons name="arrow-forward" size={20} color={Colors.warmWhite} />
                 </TouchableOpacity>
