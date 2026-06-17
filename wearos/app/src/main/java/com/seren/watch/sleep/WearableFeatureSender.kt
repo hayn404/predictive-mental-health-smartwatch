@@ -14,9 +14,9 @@ import java.nio.ByteOrder
  * Wire format (little-endian, version 1):
  *   header  : magic 'SRN1' (4 bytes), version u16, reserved u16
  *   metadata: captureStartMs i64, epochCount u32, featuresPerEpoch u16, reserved u16
- *   payload : epochCount × (startMs i64 + 11 × float32)
+ *   payload : epochCount × (startMs i64 + 10 × float32)   <- 10 (post-XAI prune)
  *
- * Total bytes per epoch = 8 + 11*4 = 52.  A 9-hour night ≈ 1080 epochs ≈ 56 KB.
+ * Total bytes per epoch = 8 + 10*4 = 48.  A 9-hour night ≈ 1080 epochs ≈ 52 KB.
  *
  * Message path:
  *   /seren/sleep/features/batch     — incremental batches during the night

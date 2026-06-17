@@ -16,7 +16,7 @@
  * com.seren.watch.sleep.WearableFeatureSender.encode():
  *   header  : magic 'SRN1' (i32), version u16, reserved u16
  *   metadata: captureStartMs i64, epochCount u32, featuresPerEpoch u16, reserved u16
- *   payload : epochCount × (startMs i64 + 11 × float32)
+ *   payload : epochCount × (startMs i64 + 10 × float32)   <- 10 (post-XAI prune)
  */
 
 import * as FileSystem from 'expo-file-system/legacy';
@@ -28,7 +28,10 @@ import {
 } from './sleepStageModel';
 
 const MAGIC = 0x314e5253;  // 'SRN1' little-endian
-const FEATURES_PER_EPOCH = 11;
+// 10 cache features per epoch (immobility_frac was dropped after XAI showed it as
+// dead weight). The wire format's `featuresPerEpoch` header field is still validated
+// against this constant so a mismatched watch + phone pair fails loud.
+const FEATURES_PER_EPOCH = 10;
 const SLEEP_DIR = 'seren_sleep';
 
 export interface SessionResult {

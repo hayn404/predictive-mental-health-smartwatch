@@ -6,22 +6,27 @@ import com.seren.watch.health.HrSample
 /**
  * Aligned 30-second sleep epoch.
  *
- * `features` holds the 11 cache features in the order:
+ * `features` holds the 10 cache features in the order:
  *   hr_mean, hr_std, hr_min, hr_max, hr_range,
  *   hr_succdiff_std, hr_delta_prev,
- *   act_count, immobility_frac, act_max, act_std
+ *   act_count, act_max, act_std
  *
- * The 12th feature (time_of_night) is appended on the phone once the
- * full night is known. Do NOT add it here.
+ * `immobility_frac` was removed after XAI (Captum Integrated Gradients) showed
+ * pooled |IG| of 0.017 — 5x lower than any other feature, ~0% of the model's
+ * decision-making. Dropping it shrinks the wire payload from 52 to 48 bytes
+ * per epoch and saves a tiny bit of watch CPU.
+ *
+ * The 11th feature (time_of_night) is appended on the phone once the full
+ * night is known. Do NOT add it here.
  */
 data class RawEpochFeatures(
     /** Epoch start time, Unix ms. */
     val startMs: Long,
-    /** Length 11. */
+    /** Length 10. */
     val features: FloatArray,
 ) {
     companion object {
-        const val SIZE = 11
+        const val SIZE = 10
     }
 }
 
@@ -29,10 +34,11 @@ data class RawEpochFeatures(
  * Rolling 30-s epoch aggregator. Buffers raw HR and accel samples and emits
  * a [RawEpochFeatures] every time an epoch boundary is crossed.
  *
- * Mirrors the Python feature extraction in ml/sleep/prepare_features.py exactly:
+ * Mirrors the Python feature extraction in ml/sleep/prepare_features.py exactly,
+ * minus `immobility_frac` (dropped after XAI — see RawEpochFeatures kdoc):
  *   - HR features use a ±120-s window centred on the epoch midpoint
  *   - Accel features use only the in-epoch samples (start..start+30s)
- *   - acc_count / immob / act_max use abs-diff of magnitude; act_std uses raw magnitude std
+ *   - act_count / act_max use abs-diff of magnitude; act_std uses raw magnitude std
  *
  * Thread-safety: not safe for concurrent calls. Drive from a single coroutine.
  */
@@ -93,7 +99,7 @@ class EpochAggregator(
     private fun epochStartFor(index: Int): Long = epochStartMs + index.toLong() * EPOCH_MS
 
     /**
-     * Returns the 11-feature vector for the epoch beginning at `et`, or null
+     * Returns the 10-feature vector for the epoch beginning at `et`, or null
      * if there is no HR data in the window (drop epoch, reset prevHrMean).
      */
     private fun extract(et: Long): FloatArray? {
@@ -121,31 +127,29 @@ class EpochAggregator(
         val hrSdsd = if (hrSeg.size > 2) populationStd(diffs(hrSeg)) else 0.0
         val hrDlt = prevHrMean?.let { hrMean - it } ?: 0.0
 
-        val (actCount, immob, actMax, actStd) = if (accSeg.size > 1) {
+        val (actCount, actMax, actStd) = if (accSeg.size > 1) {
             val d = diffs(accSeg).map { kotlin.math.abs(it) }
             val count = d.sum()
-            val frac = d.count { it < MOVE_THRESH_G } / d.size.toDouble()
             val max = d.max()
             val std = populationStd(accSeg)
-            FourDoubles(count, frac, max, std)
+            ThreeDoubles(count, max, std)
         } else {
-            FourDoubles(0.0, 0.0, 0.0, 0.0)
+            ThreeDoubles(0.0, 0.0, 0.0)
         }
 
         prevHrMean = hrMean
         return floatArrayOf(
             hrMean.toFloat(), hrStd.toFloat(), hrMin.toFloat(), hrMax.toFloat(), hrRng.toFloat(),
             hrSdsd.toFloat(), hrDlt.toFloat(),
-            actCount.toFloat(), immob.toFloat(), actMax.toFloat(), actStd.toFloat(),
+            actCount.toFloat(), actMax.toFloat(), actStd.toFloat(),
         )
     }
 
-    private data class FourDoubles(val a: Double, val b: Double, val c: Double, val d: Double)
+    private data class ThreeDoubles(val a: Double, val b: Double, val c: Double)
 
     companion object {
         const val EPOCH_MS: Long = 30_000L
         const val HR_WIN_MS: Long = 120_000L
-        const val MOVE_THRESH_G: Double = 0.02
     }
 }
 
