@@ -15,14 +15,42 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow } from '@/constants/theme';
-import { useCheckin, useHealthData } from '@/hooks/useHealthData';
+import { useCheckin, useVoiceAssistant, useHealthData } from '@/hooks/useHealthData';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { EmotionalMaturityCard } from '@/components/ui/EmotionalMaturityCard';
 
 export default function CheckinScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isRecording, isTranscribing, transcript, isAnalyzing, result, waveAmplitudes, recordingDuration, startRecording, stopAndAnalyze, submitText, reset } = useCheckin();
-  const { checkinHistory: history } = useHealthData();
+  const checkin = useCheckin();
+  const duet = useVoiceAssistant();
+  const [duetMode, setDuetMode] = useState(false);
+
+  // Unified view over whichever flow is active. Branched per-field (rather
+  // than picking one whole hook-result object) so each value stays a plain
+  // primitive/array — avoids TypeScript having to narrow a union of two
+  // differently-shaped hook return types just to read a couple of fields.
+  const isRecording = duetMode ? duet.isRecording : checkin.isRecording;
+  const isTranscribing = duetMode ? duet.isTranscribing : checkin.isTranscribing;
+  const isAnalyzing = duetMode ? duet.isAnalyzing : checkin.isAnalyzing;
+  const isSpeaking = duetMode ? duet.isSpeaking : false;
+  const transcript = duetMode ? duet.transcript : checkin.transcript;
+  const recordingDuration = duetMode ? duet.recordingDuration : checkin.recordingDuration;
+  const waveAmplitudes = duetMode ? duet.waveAmplitudes : checkin.waveAmplitudes;
+  const result = duetMode ? duet.result : checkin.result;
+  const submitText = checkin.submitText; // text mode always uses the simple flow — no duet equivalent
+
+  const reset = () => { duetMode ? duet.reset() : checkin.reset(); };
+
+  const handleMicPress = () => {
+    if (duetMode) {
+      if (isSpeaking) return duet.interrupt(); // tap-to-interrupt — see voiceAssistant.ts
+      return isRecording ? duet.stopRecording() : duet.start();
+    }
+    return isRecording ? checkin.stopAndAnalyze() : checkin.startRecording();
+  };
+
+  const { checkinHistory: history, emotionalMaturity } = useHealthData();
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('text');
   const [textInput, setTextInput] = useState('');
   const micPulse = useRef(new Animated.Value(1)).current;
@@ -93,6 +121,10 @@ export default function CheckinScreen() {
         </View>
 
         {!result && !isAnalyzing && !isTranscribing && (
+          <EmotionalMaturityCard snapshot={emotionalMaturity} />
+        )}
+
+        {!result && !isAnalyzing && !isTranscribing && (
           <View style={styles.voiceInteractionArea}>
             {/* Mode Toggle */}
             <View style={styles.modeToggle}>
@@ -112,13 +144,29 @@ export default function CheckinScreen() {
               </TouchableOpacity>
             </View>
 
+            {inputMode === 'voice' && (
+              <TouchableOpacity
+                style={styles.duetToggleRow}
+                onPress={() => setDuetMode(v => !v)}
+                activeOpacity={0.8}
+                disabled={isRecording || isTranscribing || isAnalyzing || isSpeaking}
+              >
+                <MaterialIcons
+                  name={duetMode ? 'toggle-on' : 'toggle-off'}
+                  size={26}
+                  color={duetMode ? Colors.violet : Colors.warmGray400}
+                />
+                <Text style={styles.duetToggleText}>Seren talks back</Text>
+              </TouchableOpacity>
+            )}
+
             {inputMode === 'voice' ? (
               <>
                 {/* Mic Box */}
                 <View style={styles.micGlowContainer}>
                   <TouchableOpacity
                     style={[styles.micButton, isRecording && { backgroundColor: '#FEE2E2' }]}
-                    onPress={isRecording ? stopAndAnalyze : startRecording}
+                    onPress={handleMicPress}
                     activeOpacity={0.85}
                     disabled={isTranscribing}
                   >
@@ -161,9 +209,9 @@ export default function CheckinScreen() {
                 <View style={styles.transcriptCard}>
                   <View style={styles.transcriptHeader}>
                     <View style={styles.liveIndicator}>
-                      <View style={[styles.liveIndicatorDot, { backgroundColor: isRecording ? '#EF4444' : isTranscribing ? '#F59E0B' : Colors.warmGray400 }]} />
-                      <Text style={[styles.liveIndicatorText, { color: isRecording ? '#EF4444' : isTranscribing ? '#F59E0B' : Colors.textMuted }]}>
-                        {isRecording ? 'CAPTURING TONE & TEXT' : isTranscribing ? 'WHISPER TRANSCRIBING' : 'READY'}
+                      <View style={[styles.liveIndicatorDot, { backgroundColor: isRecording ? '#EF4444' : isTranscribing ? '#F59E0B' : isSpeaking ? Colors.violet : Colors.warmGray400 }]} />
+                      <Text style={[styles.liveIndicatorText, { color: isRecording ? '#EF4444' : isTranscribing ? '#F59E0B' : isSpeaking ? Colors.violet : Colors.textMuted }]}>
+                        {isRecording ? 'CAPTURING TONE & TEXT' : isTranscribing ? 'TRANSCRIBING' : isSpeaking ? 'SEREN SPEAKING' : 'READY'}
                       </Text>
                     </View>
                     <View style={styles.privacyProtectedBadge}>
@@ -171,7 +219,7 @@ export default function CheckinScreen() {
                     </View>
                   </View>
                   <Text style={styles.transcriptContent}>
-                    {isTranscribing ? 'Sending audio to Whisper for transcription...'
+                    {isTranscribing ? 'Converting your speech to text...'
                       : transcript || (isRecording ? "How are you feeling today? I'm listening." : 'Tap the microphone to start recording')}
                     {isRecording && <Text style={{ color: '#C4B5FD', fontSize: FontSize.lg }}> |</Text>}
                   </Text>
@@ -179,7 +227,7 @@ export default function CheckinScreen() {
 
                 {/* Action Buttons */}
                 {isRecording && (
-                  <TouchableOpacity style={styles.endButton} onPress={stopAndAnalyze}>
+                  <TouchableOpacity style={styles.endButton} onPress={handleMicPress}>
                     <MaterialIcons name="check-circle-outline" size={20} color={Colors.warmWhite} />
                     <Text style={styles.endButtonText}>Stop & Analyze</Text>
                   </TouchableOpacity>
@@ -202,7 +250,8 @@ export default function CheckinScreen() {
                   <View style={styles.voiceHintContainer}>
                     <MaterialIcons name="info-outline" size={14} color={Colors.textMuted} />
                     <Text style={styles.voiceHintText}>
-                      Requires Whisper API key configured in Settings. Audio is recorded, sent to Whisper for transcription, then analyzed by the LLM.
+                      Requires a speech-to-text provider configured in Settings (Nemotron relay or Whisper API key).
+                      {duetMode ? ' "Seren talks back" is on — she\'ll speak her response aloud; tap the mic again to interrupt.' : ' Audio is transcribed, then analyzed by the LLM.'}
                     </Text>
                   </View>
                 )}
@@ -273,7 +322,7 @@ export default function CheckinScreen() {
             </Text>
             <Text style={styles.analyzingSubtext}>
               {isTranscribing
-                ? 'Whisper AI is converting your speech to text'
+                ? 'Converting your speech to text'
                 : 'Cross-referencing your words with biometric data'}
             </Text>
           </View>
@@ -294,6 +343,14 @@ export default function CheckinScreen() {
                   </Text>
                 </View>
               </View>
+
+              {duetMode && isSpeaking && (
+                <TouchableOpacity style={styles.speakingBanner} onPress={() => duet.interrupt()} activeOpacity={0.8}>
+                  <MaterialIcons name="volume-up" size={16} color={Colors.violet} />
+                  <Text style={styles.speakingBannerText}>Seren is speaking — tap to interrupt</Text>
+                </TouchableOpacity>
+              )}
+
               {/* AI Empathetic Response */}
               {result?.empathyResponse ? (
                 <View style={styles.empathySection}>
@@ -607,6 +664,22 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 20,
   },
+  speakingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.violetMuted,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    marginBottom: Spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  speakingBannerText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold,
+    color: Colors.violet,
+  },
   empathySection: {
     backgroundColor: Colors.violet + '08',
     borderRadius: Radius.lg,
@@ -736,6 +809,17 @@ const styles = StyleSheet.create({
   },
   modeBtnTextActive: {
     color: Colors.warmWhite,
+  },
+  duetToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: Spacing.md,
+  },
+  duetToggleText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    color: Colors.textSecondary,
   },
   textInputIcon: {
     width: 80,

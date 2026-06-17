@@ -22,6 +22,7 @@ import {
   PersonalBaseline,
   SleepAnalysis,
   CheckinAnalysis,
+  CheckinMeta,
   Recommendation,
   LocationVisit,
   LocationDiversitySummary,
@@ -50,7 +51,7 @@ export interface SQLiteDatabase {
 // Schema
 // ============================================================
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const CREATE_TABLES = `
   CREATE TABLE IF NOT EXISTS biometric_samples (
@@ -107,7 +108,12 @@ const CREATE_TABLES = `
     insights_json TEXT,
     hr_at_checkin REAL,
     hrv_at_checkin REAL,
-    stress_at_checkin REAL
+    stress_at_checkin REAL,
+    themes_json TEXT,
+    emotional_intensity REAL,
+    empathy_response TEXT,
+    suggested_follow_up TEXT,
+    meta_json TEXT
   );
 
   CREATE TABLE IF NOT EXISTS recommendations_log (
@@ -216,10 +222,39 @@ async function runMigrations(database: SQLiteDatabase): Promise<void> {
     const row = await database.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
     const current = row?.user_version ?? 0;
     if (current >= SCHEMA_VERSION) return;
-    // Future: apply migrations for versions (current, SCHEMA_VERSION] here.
+    if (current < 2) {
+      await migrateToV2(database);
+    }
     await database.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   } catch (e) {
     console.warn('[Seren] DB migration check skipped:', e);
+  }
+}
+
+/**
+ * v2: persist the full LLM analysis on checkins (themes, emotional intensity,
+ * empathy response, suggested follow-up) plus pipeline provenance (meta_json) —
+ * previously computed in-memory every check-in but dropped on reload because
+ * the columns didn't exist. Powers services/ai/emotionalMaturity.ts.
+ *
+ * CREATE_TABLES already adds these columns for fresh installs; ALTER TABLE here
+ * upgrades existing databases. Wrapped per-column so re-running (or a fresh
+ * install that already has the column) is a harmless no-op.
+ */
+async function migrateToV2(database: SQLiteDatabase): Promise<void> {
+  const newColumns: [string, string][] = [
+    ['themes_json', 'TEXT'],
+    ['emotional_intensity', 'REAL'],
+    ['empathy_response', 'TEXT'],
+    ['suggested_follow_up', 'TEXT'],
+    ['meta_json', 'TEXT'],
+  ];
+  for (const [name, type] of newColumns) {
+    try {
+      await database.execAsync(`ALTER TABLE checkins ADD COLUMN ${name} ${type}`);
+    } catch {
+      // Column already exists — ignore.
+    }
   }
 }
 
@@ -412,13 +447,38 @@ export async function getSetting(key: string): Promise<string | null> {
 
 export async function saveCheckin(checkin: CheckinAnalysis): Promise<void> {
   await getDb().runAsync(
-    `INSERT OR REPLACE INTO checkins (id, timestamp, transcript, sentiment, sentiment_score, emotions_json, insights_json, hr_at_checkin, hrv_at_checkin, stress_at_checkin)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO checkins (
+       id, timestamp, transcript, sentiment, sentiment_score, emotions_json, insights_json,
+       hr_at_checkin, hrv_at_checkin, stress_at_checkin,
+       themes_json, emotional_intensity, empathy_response, suggested_follow_up, meta_json
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     checkin.id, checkin.timestamp, checkin.transcript,
     checkin.sentiment, checkin.sentimentScore,
     JSON.stringify(checkin.emotionScores), JSON.stringify(checkin.keyInsights),
     checkin.hrAtCheckin, checkin.hrvAtCheckin, checkin.stressAtCheckin,
+    JSON.stringify(checkin.themes ?? []), checkin.emotionalIntensity ?? 0,
+    checkin.empathyResponse ?? '', checkin.suggestedFollowUp ?? null,
+    checkin.meta ? JSON.stringify(checkin.meta) : null,
   );
+}
+
+/**
+ * Patch just the `meta` field of an already-saved check-in — used by
+ * voiceAssistant.ts to record full-turn latency (and ttsUsed) once a duet
+ * turn finishes speaking, without racing saveCheckin()'s own write (which
+ * fires immediately after analysis, before TTS playback has even started).
+ * Merges with any existing meta rather than overwriting it.
+ */
+export async function updateCheckinMeta(id: string, patch: Partial<CheckinMeta>): Promise<void> {
+  const row = await getDb().getFirstAsync<{ meta_json: string | null }>(
+    'SELECT meta_json FROM checkins WHERE id = ?',
+    id,
+  );
+  if (!row) return;
+  const existing = row.meta_json ? JSON.parse(row.meta_json) : {};
+  const merged = { ...existing, ...patch };
+  await getDb().runAsync('UPDATE checkins SET meta_json = ? WHERE id = ?', JSON.stringify(merged), id);
 }
 
 export async function getRecentCheckins(days: number): Promise<CheckinAnalysis[]> {
@@ -435,13 +495,14 @@ export async function getRecentCheckins(days: number): Promise<CheckinAnalysis[]
     sentimentScore: r.sentiment_score,
     emotionScores: JSON.parse(r.emotions_json || '{}'),
     keyInsights: JSON.parse(r.insights_json || '[]'),
-    themes: [],
-    emotionalIntensity: 0,
-    empathyResponse: '',
-    suggestedFollowUp: null,
+    themes: r.themes_json ? JSON.parse(r.themes_json) : [],
+    emotionalIntensity: r.emotional_intensity ?? 0,
+    empathyResponse: r.empathy_response ?? '',
+    suggestedFollowUp: r.suggested_follow_up ?? null,
     hrAtCheckin: r.hr_at_checkin,
     hrvAtCheckin: r.hrv_at_checkin,
     stressAtCheckin: r.stress_at_checkin,
+    meta: r.meta_json ? JSON.parse(r.meta_json) : undefined,
   }));
 }
 

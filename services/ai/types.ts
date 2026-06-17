@@ -356,6 +356,26 @@ export interface CheckinAnalysis {
   hrAtCheckin: number;
   hrvAtCheckin: number;
   stressAtCheckin: number;
+
+  /**
+   * Pipeline provenance — which providers actually produced this check-in.
+   * Optional/best-effort: older rows (pre-maturity-tracking) won't have it.
+   * Powers emotionalMaturity.ts; never shown raw to the end user.
+   */
+  meta?: CheckinMeta;
+}
+
+export interface CheckinMeta {
+  /** How the transcript was captured */
+  inputMode: 'voice' | 'text';
+  /** Which ASR backend produced the transcript, if voice */
+  asrProvider?: 'nemotron' | 'whisper' | null;
+  /** Which analysis path produced sentiment/emotions/empathy */
+  llmProvider?: string | null; // e.g. 'groq', 'openrouter', or 'local' for the VADER fallback
+  /** Whether Seren spoke the response back (TTS) */
+  ttsUsed?: boolean;
+  /** End-to-end record→speak latency, when available (voiceAssistant duet flow) */
+  latencyMs?: number;
 }
 
 // ----------------------------------------------------------
