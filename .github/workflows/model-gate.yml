@@ -1,0 +1,29 @@
+name: model-gate
+
+# Champion/challenger gate. Blocks a PR if any model's primary metric regressed
+# vs origin/main. Make this a REQUIRED status check on `main` (Settings ->
+# Branches -> branch protection) so a worse model can never merge.
+
+on:
+  pull_request:
+    paths:
+      - "ml/**/metrics.json"
+      - "assets/ml/**"
+      - "**/*.dvc"
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # need full history to read origin/main
+
+      - run: git fetch origin main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compare candidate vs champion
+        run: python ml/ci/gate.py

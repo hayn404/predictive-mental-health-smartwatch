@@ -1,0 +1,15 @@
+{
+  "model": "sleep",
+  "eval_set_id": "walch_v1",
+  "walch_kappa": 0.482,
+  "walch_weightedF1": 0.665,
+  "walch_macroF1": 0.621,
+  "walch_accuracy": 0.661,
+  "walch_3class_weightedF1": 0.798,
+  "gate": {
+    "primary": "walch_kappa",
+    "direction": "max",
+    "min_delta": 0.0,
+    "no_regress": ["walch_weightedF1", "walch_macroF1"]
+  }
+}
