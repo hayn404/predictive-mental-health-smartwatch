@@ -4,6 +4,7 @@ export default function OnboardingLayout() {
     return (
         <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
             <Stack.Screen name="welcome" />
+            <Stack.Screen name="profile" />
             <Stack.Screen name="sync" />
             <Stack.Screen name="privacy" />
         </Stack>

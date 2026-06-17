@@ -60,7 +60,7 @@ export default function WelcomeScreen() {
             setCurrentSlide(next);
             scrollRef.current?.scrollTo({ x: next * width, animated: true });
         } else {
-            router.push('/onboarding/sync');
+            router.push('/onboarding/profile' as any);
         }
     };
 
@@ -143,7 +143,7 @@ export default function WelcomeScreen() {
                 </TouchableOpacity>
 
                 {currentSlide < slides.length - 1 ? (
-                    <TouchableOpacity onPress={() => router.push('/onboarding/sync')} style={styles.skipBtn}>
+                    <TouchableOpacity onPress={() => router.push('/onboarding/profile' as any)} style={styles.skipBtn}>
                         <Text style={styles.skipText}>Skip introduction</Text>
                     </TouchableOpacity>
                 ) : <View style={styles.skipBtnPlaceholder} />}
