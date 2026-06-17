@@ -30,9 +30,10 @@ import sys
 
 def champion(path: str):
     """The metrics.json as it exists on origin/main, or None if the model is new."""
+    git_path = path.replace("\\", "/")  # git wants forward slashes (Windows glob gives \)
     try:
         blob = subprocess.check_output(
-            ["git", "show", f"origin/main:{path}"], stderr=subprocess.DEVNULL
+            ["git", "show", f"origin/main:{git_path}"], stderr=subprocess.DEVNULL
         )
         return json.loads(blob)
     except subprocess.CalledProcessError:

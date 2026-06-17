@@ -11,11 +11,21 @@ sleep:
   epochs: 80
   arch: tcn_bigru_bn_v1
 
+stress:
+  # XGBoost (mirrors ml/stress/config/default.yaml)
+  n_estimators: 200
+  max_depth: 6
+  learning_rate: 0.1
+  subsample: 0.8
+  colsample_bytree: 0.8
+  window_sec: 300
+  label_purity: 0.8
+  cv_strategy: loso          # leave-one-subject-out for the dev metric
+  train_on: SIPD             # dev datasets (SIPD + PhysioStress fusion)
+  final_test: WESAD          # held-out cross-dataset test
+  normalization: per_subject
+
 # Fill these in as you wire each model's train stage into dvc.yaml.
-# stress:
-#   max_depth: 4
-#   n_estimators: 200
-#   learning_rate: 0.05
 # focus:
 #   max_depth: 2
 #   n_estimators: 400

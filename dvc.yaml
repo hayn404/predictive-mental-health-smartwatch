@@ -27,14 +27,21 @@ stages:
       - ml/sleep/metrics.json:
           cache: false
 
+  train_stress:
+    cmd: python ml/stress/src/train.py --params params.yaml --data data/stress
+         --out assets/ml/stress --metrics ml/stress/metrics.json
+    deps:
+      - ml/stress/src/train.py
+      - ml/stress/src/features.py
+      - ml/stress/src/preprocessing.py
+      - data/stress
+    params:
+      - stress
+    outs:
+      - assets/ml/stress/stress_model.json
+    metrics:
+      - ml/stress/metrics.json:
+          cache: false
+
   # --- replicate per model once its train script honours the contract above ---
-  #
-  # train_stress:
-  #   cmd: python ml/stress/src/train.py --params params.yaml --data data/stress
-  #        --out assets/ml/stress --metrics ml/stress/metrics.json
-  #   deps: [ml/stress/src/train.py, data/stress]
-  #   params: [stress]
-  #   outs: [assets/ml/stress/stress_model.json]
-  #   metrics: [ml/stress/metrics.json: {cache: false}]
-  #
-  # train_focus / train_bioage / train_depression: same shape.
+  # train_focus / train_bioage / train_depression: same shape as train_stress.
