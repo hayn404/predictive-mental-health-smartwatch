@@ -7,8 +7,12 @@ Env:  pip install -U onnx2tf tensorflow onnxruntime onnx onnx-graphsurgeon onnxs
 Run:  python ml/sleep/convert_onnx_to_tflite.py
 Out:  assets/ml/sleep/sleep_stage_model.tflite  (+ parity report vs ONNX)
 
-Input is pinned to a static [1, 41, 12] (batch 1, SEQ_LEN 41, 12 features) which is
+Input is pinned to a static [1, 41, 11] (batch 1, SEQ_LEN 41, 11 features) which is
 exactly how the app windows the night -> robust TFLite conversion of the BiLSTM.
+
+NOTE: feature count changed 12 -> 11 after XAI confirmed `immobility_frac` is dead
+weight. If you see a shape-mismatch error, you're converting an old (pre-prune) ONNX;
+re-run the training notebook to produce a fresh 11-feature ONNX.
 """
 import subprocess
 import sys
@@ -20,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ONNX = ROOT / "assets" / "ml" / "sleep" / "sleep_stage_model.onnx"
 OUTDIR = ROOT / "assets" / "ml" / "sleep"
 WORK = OUTDIR / "_tflite_work"
-SEQ, FEAT, CLS = 41, 12, 4
+SEQ, FEAT, CLS = 41, 11, 4
 
 
 def convert():

@@ -1,21 +1,26 @@
 /**
  * Seren AI — Sleep Stage Classification (v3.2, on-device ONNX inference)
  * =======================================================================
- * Model:   TCN + BiLSTM seq2seq, trained on BIDSleep (n=47/252 nights),
- *          held-out tested on Walch (n=31). 4-class: Wake/Light/Deep/REM.
- * Input:   features [batch, seq_len=41, n_features=12]
- *          12 features per 30-s epoch:
+ * Model:   TCN + BiGRU seq2seq (BN-normalized for clean TFLite conversion;
+ *          earlier LayerNorm + BiLSTM variant produced ~45% argmax drift through
+ *          onnx2tf because TFLite decomposes LayerNorm into MEAN-chains that drift
+ *          and lacks a clean BiLSTM primitive). Trained on BIDSleep (40 train / 7 val subjects,
+ *          subject-disjoint), held-out tested on Walch (n=31). 4-class:
+ *          Wake / Light / Deep / REM.
+ * Input:   features [batch, seq_len=41, n_features=11]
+ *          11 features per 30-s epoch (lean post-XAI; was 12, dropped
+ *          `immobility_frac` after pooled |IG| confirmed it as dead weight):
  *            hr_mean, hr_std, hr_min, hr_max, hr_range,
  *            hr_succdiff_std, hr_delta_prev,
- *            act_count, immobility_frac, act_max, act_std,
+ *            act_count, act_max, act_std,
  *            time_of_night (linear [-1,+1] across the night)
  * Output:  logits [batch, seq_len=41, 4]  → argmax per epoch
  *
  * Data flow:
- *   Wear OS watch → 30-s epoch raw features (Float32Array[N, 12])
+ *   Wear OS watch → 30-s epoch raw features (Float32Array[N, 10])
  *     → phone receives via WearableListenerService
  *     → robustNormalizePerNight()  (median + 1.4826*MAD per feature)
- *     → window into disjoint [1, 41, 12] tensors (stride 41)
+ *     → window into disjoint [1, 41, 11] tensors (stride 41)
  *     → ONNX inference per window
  *     → flatten + argmax + map to SleepStageType[]
  */
@@ -27,7 +32,7 @@ import { SleepStageType, RawSleepStage } from './types';
 // ────────────────────────────────────────────────────────────────
 // Contract — must match assets/ml/sleep/sleep_model_metadata.json
 // ────────────────────────────────────────────────────────────────
-export const V32_NUM_FEATURES = 12;
+export const V32_NUM_FEATURES = 11;
 export const V32_SEQ_LEN = 41;
 export const V32_EPOCH_SEC = 30;
 export const V32_NUM_CLASSES = 4;
@@ -35,7 +40,7 @@ export const V32_NUM_CLASSES = 4;
 export const V32_FEATURE_NAMES = [
   'hr_mean', 'hr_std', 'hr_min', 'hr_max', 'hr_range',
   'hr_succdiff_std', 'hr_delta_prev',
-  'act_count', 'immobility_frac', 'act_max', 'act_std',
+  'act_count', 'act_max', 'act_std',
   'time_of_night',
 ] as const;
 
@@ -50,11 +55,11 @@ export interface RawEpochFeatures {
   /** Epoch start time (Unix ms). */
   startTime: number;
   /**
-   * The 11 cache features in the order of V32_FEATURE_NAMES[0..11].
+   * The 10 cache features in the order of V32_FEATURE_NAMES[0..10].
    * Do NOT pre-pend time_of_night — the phone fills that in once the
    * full night is known.
    */
-  values: Float32Array; // length 11
+  values: Float32Array; // length 10
 }
 
 export interface V32SleepPrediction {
