@@ -1,6 +1,6 @@
 {
   "version": "3.2.0",
-  "modelType": "tcn_bilstm_seq2seq_hr_actigraphy",
+  "modelType": "tcn_bigru_seq2seq_hr_actigraphy",
   "task": "sleep_stage_classification_4class",
   "trainData": "BIDSleep (Apple Watch)",
   "testData": "Walch/Sleep-Accel (held-out)",

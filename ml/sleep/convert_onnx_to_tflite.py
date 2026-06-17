@@ -8,7 +8,7 @@ Run:  python ml/sleep/convert_onnx_to_tflite.py
 Out:  assets/ml/sleep/sleep_stage_model.tflite  (+ parity report vs ONNX)
 
 Input is pinned to a static [1, 41, 11] (batch 1, SEQ_LEN 41, 11 features) which is
-exactly how the app windows the night -> robust TFLite conversion of the BiLSTM.
+exactly how the app windows the night -> robust TFLite conversion of the BiGRU.
 
 NOTE: feature count changed 12 -> 11 after XAI confirmed `immobility_frac` is dead
 weight. If you see a shape-mismatch error, you're converting an old (pre-prune) ONNX;
