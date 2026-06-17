@@ -21,7 +21,7 @@ depression screening, and voice-emotion — plus PHQ-9 / GAD-7 self-report tools
   EpochAggregator → feature batches                                 ▼
   (sleep 48 B/epoch; env light+GPS)                          on-device models
                                                               ├─ stress   (XGBoost / HRV)
-                                                              ├─ sleep    (TCN+BiLSTM / TFLite)
+                                                              ├─ sleep    (TCN+BiGRU / TFLite)
                                                               ├─ focus    (XGBoost / HRV)
                                                               ├─ bio-age  (XGBoost / HRV)
                                                               ├─ depression (XGBoost / actigraphy)
@@ -35,7 +35,7 @@ depression screening, and voice-emotion — plus PHQ-9 / GAD-7 self-report tools
 | Model | Task | Data (train → test) | Headline | Runtime |
 |---|---|---|---|---|
 | **Stress** | binary stress | SIPD + PhysioStress → WESAD (cross-dataset) | AUC **0.86** | XGBoost (TS tree) |
-| **Sleep** | 4-class staging (Wake/Light/Deep/REM) | BIDSleep → Walch (zero-shot) | κ **0.48** · wF1 0.665 · Deep recall 0.78 · 3-class wF1 0.80 | TCN+BiLSTM (TFLite) |
+| **Sleep** | 4-class staging (Wake/Light/Deep/REM) | BIDSleep → Walch (zero-shot) | κ **0.48** · wF1 0.665 · Deep recall 0.78 · 3-class wF1 0.80 | TCN+BiGRU (TFLite) |
 | **Focus** | cognitive engagement | CogWear (LOSO) → MAUS (external) | AUC **0.82** (0.95 sustained) | XGBoost (TS tree) |
 | **Bio-age** | physiological age + age-gap | Autonomic Aging → Fantasia | MAE **7.6 yr** · young-vs-old AUC 0.94 | XGBoost (TS tree) |
 | **Depression** | screening | Depresjon (actigraphy) | acc **0.92** · ROC-AUC 0.97 | XGBoost (TS tree) |
