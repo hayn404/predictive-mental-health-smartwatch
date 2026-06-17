@@ -53,9 +53,25 @@ A `dvc.yaml` stage calls `python ml/<model>/train.py ...`. That script must:
 `direction` is `max` for accuracy/AUC/F1/κ and `min` for MAE/loss. Changing
 `eval_set_id` blocks the gate (prevents "better" scores on an easier test set).
 
-Sleep is wired (`train_sleep` stage + `ml/sleep/metrics.json` baseline). Replicate
-the stage for stress / focus / bio-age / depression by uncommenting the templates
-in `dvc.yaml` once each `train.py` honours the contract above.
+**Sleep** and **stress** are wired (`train_sleep` / `train_stress` stages +
+`ml/sleep/metrics.json` / `ml/stress/metrics.json` baselines). Replicate the stage
+for focus / bio-age / depression by copying `train_stress` in `dvc.yaml` once each
+`train.py` honours the contract above.
+
+### Data sources (download once → `data/<model>/` → DVC → DagsHub)
+After the first `dvc add` + `dvc push`, CI pulls everything from DagsHub — Kaggle
+is never touched again.
+
+| Model | `data/<model>/` holds | Source |
+|---|---|---|
+| sleep | `bidsleep_features.pkl`, `walch_features.pkl` | Kaggle `dohahemdan17/seren-sleep-cache` |
+| stress | WESAD (held-out test), Stress-Predict/SIPD, PhysioStress | Kaggle `orvile/wesad-...`, `dohahemdan17/stress-predict-dataset`, `dohahemdan17/wearable-dataset` |
+
+### Gate metrics (primary)
+| Model | primary | direction | eval_set_id |
+|---|---|---|---|
+| sleep | `walch_kappa` | max | `walch_v1` |
+| stress | `heldout_auc` (SIPD→WESAD) | max | `wesad_v1` |
 
 ## Notes / limits
 - **GitHub-hosted runners have no GPU** — the sleep deep model needs the

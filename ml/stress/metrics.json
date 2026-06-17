@@ -1,0 +1,15 @@
+{
+  "model": "stress",
+  "eval_set_id": "wesad_v1",
+  "heldout_auc": 0.858,
+  "heldout_dataset": "WESAD",
+  "train_datasets": ["SIPD", "PhysioStress"],
+  "cv_auc_roc_loso": 0.657,
+  "n_features": 14,
+  "gate": {
+    "primary": "heldout_auc",
+    "direction": "max",
+    "min_delta": 0.0,
+    "no_regress": ["cv_auc_roc_loso"]
+  }
+}

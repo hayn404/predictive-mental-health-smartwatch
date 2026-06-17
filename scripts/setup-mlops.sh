@@ -27,10 +27,17 @@ dvc remote modify origin --local secret_access_key "${DAGSHUB_TOKEN}"
 for f in \
   data/sleep/bidsleep_features.pkl \
   data/sleep/walch_features.pkl \
+  data/stress \
   data/depresjon \
   data/cogwear ; do
   [ -e "$f" ] && dvc add "$f" || echo "skip (missing): $f"
 done
+
+# data/stress/ should hold the three source datasets (download once, then this
+# tracks them on DagsHub so CI never touches Kaggle again):
+#   - WESAD            (kaggle: orvile/wesad-wearable-stress-affect-detection-dataset) -> held-out test
+#   - Stress-Predict   (kaggle: dohahemdan17/stress-predict-dataset)                   -> SIPD (train)
+#   - PhysioStress     (kaggle: dohahemdan17/wearable-dataset)                          -> train (fusion)
 
 git add .dvc .dvcignore dvc.yaml params.yaml 2>/dev/null || true
 git add data/*.dvc data/**/*.dvc data/.gitignore 2>/dev/null || true
