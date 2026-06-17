@@ -1,0 +1,40 @@
+# DVC pipeline. `dvc repro` runs the stages; `dvc push` uploads data/model
+# artifacts to the DagsHub remote. Data lives in DVC (not git, not Kaggle);
+# the small per-model metrics.json stays in git so the CI gate can diff it.
+#
+# Per-stage contract for the training script:
+#   - reads its hyperparameters from params.yaml (the `params:` list below)
+#   - reads its input data from data/<model>/  (DVC-tracked, `dvc pull`ed first)
+#   - writes the exported model into assets/ml/<model>/
+#   - writes ml/<model>/metrics.json  (held-out metrics + a `gate` block)
+
+stages:
+  train_sleep:
+    cmd: python ml/sleep/train.py --params params.yaml --data data/sleep
+         --out assets/ml/sleep --metrics ml/sleep/metrics.json
+    deps:
+      - ml/sleep/train.py
+      - ml/sleep/model.py
+      - ml/sleep/dataset.py
+      - data/sleep/bidsleep_features.pkl
+      - data/sleep/walch_features.pkl
+    params:
+      - sleep
+    outs:
+      - assets/ml/sleep/sleep_stage_model.tflite
+      - assets/ml/sleep/sleep_stage_model.onnx
+    metrics:
+      - ml/sleep/metrics.json:
+          cache: false
+
+  # --- replicate per model once its train script honours the contract above ---
+  #
+  # train_stress:
+  #   cmd: python ml/stress/src/train.py --params params.yaml --data data/stress
+  #        --out assets/ml/stress --metrics ml/stress/metrics.json
+  #   deps: [ml/stress/src/train.py, data/stress]
+  #   params: [stress]
+  #   outs: [assets/ml/stress/stress_model.json]
+  #   metrics: [ml/stress/metrics.json: {cache: false}]
+  #
+  # train_focus / train_bioage / train_depression: same shape.

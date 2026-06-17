@@ -1,0 +1,41 @@
+name: deploy
+
+# On merge to main (when a model/app asset changed and the gate already passed),
+# materialize the model from DagsHub and ship it over-the-air via EAS Update.
+# Models are bundled assets, so `eas update` delivers the new model to existing
+# installs on next launch — no Play Store re-release.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "assets/ml/**"
+      - "**/*.dvc"
+      - "app/**"
+      - "services/**"
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install DVC + pull model artifacts
+        run: |
+          pip install "dvc[s3]"
+          dvc remote modify origin --local access_key_id  "${{ secrets.DAGSHUB_TOKEN }}"
+          dvc remote modify origin --local secret_access_key "${{ secrets.DAGSHUB_TOKEN }}"
+          dvc pull
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci --legacy-peer-deps
+
+      - run: npm i -g eas-cli
+
+      - name: OTA ship the model
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas update --branch production --message "${{ github.event.head_commit.message }}"

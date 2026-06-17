@@ -1,0 +1,12 @@
+# CI training + gate deps (self-hosted runner). Extends ml/requirements.txt.
+-r ../requirements.txt
+
+# Data/experiment versioning
+dvc[s3]>=3.0
+dagshub
+
+# Sleep deep model (GPU on the self-hosted runner)
+torch
+captum
+onnx
+onnxruntime

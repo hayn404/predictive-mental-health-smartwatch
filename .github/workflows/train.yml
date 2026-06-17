@@ -1,0 +1,60 @@
+name: train
+
+# Train on the self-hosted "staging" machine, pull data from DagsHub via DVC
+# (NOT Kaggle), log metrics to DagsHub MLflow, push artifacts, and open a
+# candidate PR. The model only ships if model-gate.yml passes on that PR.
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "DVC stage to run (e.g. train_sleep), or 'all'"
+        default: "train_sleep"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  MLFLOW_TRACKING_URI: https://dagshub.com/hayn404/predictive-mental-health-smartwatch.mlflow
+  MLFLOW_TRACKING_USERNAME: hayn404
+  MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+
+jobs:
+  train:
+    runs-on: [self-hosted, gpu]        # your staging machine; falls back to any self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: pip install -r ml/ci/requirements.txt
+
+      - name: Configure DVC remote auth (DagsHub)
+        run: |
+          dvc remote modify origin --local access_key_id  "${{ secrets.DAGSHUB_TOKEN }}"
+          dvc remote modify origin --local secret_access_key "${{ secrets.DAGSHUB_TOKEN }}"
+
+      - name: Pull data
+        run: dvc pull
+
+      - name: Train + eval + export (DVC pipeline)
+        run: |
+          if [ "${{ inputs.stage }}" = "all" ]; then dvc repro; else dvc repro "${{ inputs.stage }}"; fi
+
+      - name: Push artifacts to DagsHub
+        run: dvc push
+
+      - name: Open candidate PR
+        env:
+          # Use a PAT (secrets.GH_PAT) so the PR triggers model-gate.yml;
+          # PRs opened with the default GITHUB_TOKEN do NOT trigger other workflows.
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+        run: |
+          BR="model/$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name  "seren-ci"
+          git config user.email "ci@seren.local"
+          git checkout -b "$BR"
+          git add -A
+          git commit -m "model: candidate from $(echo $GITHUB_SHA | cut -c1-7)" || { echo "no changes"; exit 0; }
+          git push -u origin "$BR"
+          gh pr create --base main --head "$BR" --fill --title "model: candidate $BR"
