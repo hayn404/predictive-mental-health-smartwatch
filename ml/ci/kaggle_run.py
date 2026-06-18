@@ -40,9 +40,11 @@ SLEEP_BODY = '''\
 sh(sys.executable,"-m","pip","install","-q","-r","ml/sleep/requirements.txt")
 sh(sys.executable,"-m","pip","install","-q","-U","onnx2tf","onnx-graphsurgeon","onnxsim","tf_keras")
 os.makedirs("ml/data/features/sleep", exist_ok=True)
-for f in ("bidsleep_features.pkl","walch_features.pkl","manifest.json"):
-    s=os.path.join("/kaggle/input/{cache_name}",f)
-    if os.path.exists(s): shutil.copy(s,"ml/data/features/sleep/"+f)
+print("INPUT:", os.listdir("/kaggle/input") if os.path.isdir("/kaggle/input") else "NO /kaggle/input")
+for fname in ("bidsleep_features.pkl","walch_features.pkl","manifest.json"):
+    hits = glob.glob("/kaggle/input/**/"+fname, recursive=True)
+    print(fname, "->", (hits[:1] or "NOT FOUND"))
+    if hits: shutil.copy(hits[0], "ml/data/features/sleep/"+fname)
 sh(sys.executable,"ml/sleep/train.py","--params","params.yaml","--data","ml/data/features/sleep",
    "--out","assets/ml/sleep","--metrics","ml/sleep/metrics.json")
 for f in ("assets/ml/sleep/sleep_stage_model.onnx","assets/ml/sleep/sleep_stage_model.onnx.data",
