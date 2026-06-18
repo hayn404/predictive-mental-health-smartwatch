@@ -5,8 +5,10 @@
 mlflow>=2.10
 
 # Kaggle GPU orchestration (sleep model is offloaded to a Kaggle T4 kernel;
-# the runner only pushes/polls/downloads — no torch needed on the runner)
-kaggle>=1.6
+# the runner only pushes/polls/downloads — no torch needed on the runner).
+# Pinned <1.7: the 1.7+ CLI switched to an OAuth flow that breaks headless
+# KAGGLE_USERNAME/KAGGLE_KEY auth in CI.
+kaggle>=1.6,<1.7
 
 # Figures (confusion/ROC/feature-importance/SHAP) for CPU models on the runner
 shap>=0.44
