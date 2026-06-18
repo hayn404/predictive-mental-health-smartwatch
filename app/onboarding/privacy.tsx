@@ -26,11 +26,14 @@ export default function PrivacyScreen() {
     const handleFinish = async () => {
         // Actually request the runtime permissions the models need, in sequence.
         setBusy(true);
-        try { await requestNotificationPermissions(); } catch { /* user can grant later */ }
-        try { await requestHealthConnectPermissions(); } catch { /* HC may be absent */ }
-        try { await Audio.requestPermissionsAsync(); } catch { /* mic for voice check-ins */ }
-        setBusy(false);
-        router.replace('/(tabs)');
+        try {
+            try { await requestNotificationPermissions(); } catch { /* user can grant later */ }
+            try { await requestHealthConnectPermissions(); } catch { /* HC may be absent */ }
+            try { await Audio.requestPermissionsAsync(); } catch { /* mic for voice check-ins */ }
+            router.replace('/(tabs)');
+        } finally {
+            setBusy(false);
+        }
     };
 
     return (
