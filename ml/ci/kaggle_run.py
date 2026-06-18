@@ -39,6 +39,9 @@ OUT="/kaggle/working"
 SLEEP_BODY = '''\
 sh(sys.executable,"-m","pip","install","-q","-r","ml/sleep/requirements.txt")
 sh(sys.executable,"-m","pip","install","-q","-U","onnx2tf","onnx-graphsurgeon","onnxsim","tf_keras")
+# torch 2.3.1's torch.onnx import trips on Kaggle's newer onnxscript via beartype
+# type-hints; removing beartype makes those decorators no-ops so the import works.
+subprocess.run([sys.executable,"-m","pip","uninstall","-y","beartype"])
 os.makedirs("ml/data/features/sleep", exist_ok=True)
 print("INPUT:", os.listdir("/kaggle/input") if os.path.isdir("/kaggle/input") else "NO /kaggle/input")
 for fname in ("bidsleep_features.pkl","walch_features.pkl","manifest.json"):
