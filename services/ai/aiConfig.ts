@@ -9,6 +9,8 @@
 
 import { configureLLMPreset } from './llmService';
 import { configureWhisper } from './whisperService';
+import { configureNemotron } from './nemotronAsrService';
+import { configureRemoteTTS } from './ttsService';
 
 // ============================================================
 // Internal configuration — API keys from env vars (secrets)
@@ -16,6 +18,9 @@ import { configureWhisper } from './whisperService';
 
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || '';
 const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '';
+const ELEVENLABS_API_KEY = process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY || '';
+const NEMOTRON_RELAY_URL = process.env.EXPO_PUBLIC_NEMOTRON_RELAY_URL || '';
+const NEMOTRON_RELAY_KEY = process.env.EXPO_PUBLIC_NEMOTRON_RELAY_KEY || '';
 
 const LANGUAGE = 'en';
 
@@ -49,6 +54,20 @@ export function initializeAIServices(): void {
   if (GROQ_API_KEY) {
     configureWhisper('groq', GROQ_API_KEY, LANGUAGE);
     console.log('[Seren AI] Whisper configured: Groq');
+  }
+
+  // Configure Nemotron ASR relay (optional — see server/nemotron-relay/).
+  // Whisper above stays configured regardless, so voiceAssistant.ts's
+  // Nemotron-first/Whisper-fallback has something to fall back to.
+  if (NEMOTRON_RELAY_URL) {
+    configureNemotron(NEMOTRON_RELAY_URL, NEMOTRON_RELAY_KEY || undefined, 'en-US');
+    console.log('[Seren AI] Nemotron ASR relay configured:', NEMOTRON_RELAY_URL);
+  }
+
+  // Configure remote TTS (optional — falls back to on-device voice when unset)
+  if (ELEVENLABS_API_KEY) {
+    configureRemoteTTS({ provider: 'elevenlabs', apiKey: ELEVENLABS_API_KEY });
+    console.log('[Seren AI] Remote TTS configured: ElevenLabs');
   }
 }
 

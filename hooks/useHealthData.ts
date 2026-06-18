@@ -20,9 +20,14 @@ import {
   deleteAudioFile,
 } from '@/services/ai/audioRecorder';
 import {
-  transcribeAudio,
   isWhisperConfigured,
 } from '@/services/ai/whisperService';
+import { isNemotronConfigured } from '@/services/ai/nemotronAsrService';
+import {
+  createVoiceAssistant,
+  transcribeSpeech,
+  VoiceAssistantState,
+} from '@/services/ai/voiceAssistant';
 
 export function useHealthData() {
   const w = useWellness();
@@ -88,6 +93,7 @@ export function useHealthData() {
     watchStatus,
     recommendations,
     checkinHistory,
+    emotionalMaturity: w.emotionalMaturity,
     locationDiversity,
     sunlightExposure,
     weeklyLocationDiversity,
@@ -183,37 +189,31 @@ export function useCheckin() {
       return;
     }
 
-    // Step 2: Transcribe with Whisper API
+    // Step 2: Transcribe — Nemotron first (if configured/reachable), Whisper fallback
     setIsTranscribing(true);
-    let finalTranscript: string | null = null;
 
-    const whisperReady = isWhisperConfigured();
-    console.log('[Seren] Whisper configured:', whisperReady);
-
-    if (whisperReady) {
-      finalTranscript = await transcribeAudio(audioUri);
-    }
+    const transcription = await transcribeSpeech(audioUri);
 
     // Clean up the audio file
     deleteAudioFile(audioUri);
 
-    if (!finalTranscript) {
+    if (!transcription) {
       setIsTranscribing(false);
-      if (!whisperReady) {
-        setTranscript('[Whisper not configured — add your API key in services/ai/aiConfig.ts]');
-      } else {
-        setTranscript('[Transcription failed — check your API key and network connection, then try again]');
-      }
+      const anyAsrConfigured = isWhisperConfigured() || isNemotronConfigured();
+      setTranscript(anyAsrConfigured
+        ? '[Transcription failed — check your API key(s) and network connection, then try again]'
+        : '[No speech-to-text configured — add a Whisper API key in services/ai/aiConfig.ts, or set up server/nemotron-relay/]');
       return;
     }
 
+    const finalTranscript = transcription.text;
     setTranscript(finalTranscript);
     setIsTranscribing(false);
 
     // Step 3: Analyze with LLM
     setIsAnalyzing(true);
     const [analysis] = await Promise.all([
-      w.performCheckin(finalTranscript),
+      w.performCheckin(finalTranscript, { inputMode: 'voice', asrProvider: transcription.provider }),
       new Promise(resolve => setTimeout(resolve, 1500)),
     ]);
 
@@ -258,5 +258,120 @@ export function useCheckin() {
     isRecording, isTranscribing, transcript, isAnalyzing, result,
     waveAmplitudes, recordingDuration,
     startRecording, stopAndAnalyze, submitText, reset,
+  };
+}
+
+// ============================================================
+// useVoiceAssistant — the full duet (record → ASR → analyze → speak)
+// ============================================================
+// A separate, opt-in hook rather than a replacement for useCheckin() above,
+// so the existing simple check-in flow keeps working unchanged. Pass this
+// to a UI that wants Seren to talk back (see voiceAssistant.ts for the
+// state machine and barge-in scope notes).
+
+export interface VoiceAssistantUIResult {
+  sentiment: string;
+  insights: string[];
+  empathyResponse: string;
+  followUp: string | null;
+}
+
+export function useVoiceAssistant() {
+  const w = useWellness();
+  const [state, setVAState] = useState<VoiceAssistantState>('idle');
+  const [transcript, setTranscript] = useState('');
+  const [result, setResult] = useState<VoiceAssistantUIResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+
+  const FLAT_WAVE: number[] = Array(20).fill(4);
+  const [waveAmplitudes, setWaveAmplitudes] = useState<number[]>(FLAT_WAVE);
+
+  const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const dbToAmplitude = (db: number): number => {
+    const normalized = (db + 160) / 160;
+    return 4 + normalized * 36;
+  };
+
+  // Lazy-initialized once per mount (not on every render) — the standard
+  // ref pattern for "construct an object once, even though the constructor
+  // expression itself would otherwise re-run on every render since it's a
+  // plain function call, not wrapped in useState's lazy initializer form).
+  const assistantRef = useRef<ReturnType<typeof createVoiceAssistant> | null>(null);
+  if (!assistantRef.current) {
+    assistantRef.current = createVoiceAssistant(
+      {
+        analyze: w.performCheckin,
+        recordTurnMeta: w.recordVoiceTurnMeta,
+      },
+      {
+        onStateChange: (next) => {
+          setVAState(next);
+          if (next === 'recording') {
+            setTranscript('');
+            setResult(null);
+            setError(null);
+          }
+        },
+        onTranscript: (text) => setTranscript(text),
+        onAnalysis: (analysis) => setResult({
+          sentiment: analysis.sentiment === 'distressed' ? 'concerned' : analysis.sentiment,
+          insights: analysis.keyInsights,
+          empathyResponse: analysis.empathyResponse,
+          followUp: analysis.suggestedFollowUp,
+        }),
+        onError: (e) => setError(e.message),
+        onMetering: (db) => {
+          setWaveAmplitudes(prev => [...prev.slice(1), dbToAmplitude(db)]);
+        },
+      },
+    );
+  }
+
+  useEffect(() => {
+    return () => { assistantRef.current!.dispose(); };
+  }, []);
+
+  useEffect(() => {
+    if (state === 'recording') {
+      const startTime = Date.now();
+      durationInterval.current = setInterval(() => {
+        setRecordingDuration(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+    } else {
+      if (durationInterval.current) clearInterval(durationInterval.current);
+      durationInterval.current = null;
+      setRecordingDuration(0);
+      setWaveAmplitudes(FLAT_WAVE);
+    }
+    return () => { if (durationInterval.current) clearInterval(durationInterval.current); };
+  }, [state === 'recording']);
+
+  const start = useCallback(() => assistantRef.current!.start(), []);
+  const stopRecording = useCallback(() => assistantRef.current!.stopRecording(), []);
+  /** While Seren is speaking, tapping the mic interrupts her and starts listening again. */
+  const interrupt = useCallback(() => assistantRef.current!.interrupt(), []);
+  const reset = useCallback(() => {
+    setTranscript('');
+    setResult(null);
+    setError(null);
+  }, []);
+
+  return {
+    state,
+    transcript,
+    result,
+    error,
+    waveAmplitudes,
+    recordingDuration,
+    isRecording: state === 'recording',
+    isTranscribing: state === 'transcribing',
+    isAnalyzing: state === 'analyzing',
+    isSpeaking: state === 'speaking',
+    start,
+    stopRecording,
+    interrupt,
+    reset,
   };
 }

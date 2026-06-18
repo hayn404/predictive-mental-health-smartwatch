@@ -36,6 +36,7 @@ import {
   PersonalBaseline,
   Recommendation,
   CheckinAnalysis,
+  CheckinMeta,
   BiometricFeatureVector,
   LocationDiversitySummary,
   SunlightExposureSummary,
@@ -71,6 +72,7 @@ import { processPendingSessions } from '@/services/ai/sleepReceiver';
 import { processPendingEnv } from '@/services/ai/envReceiver';
 import { recordStressPrediction } from '@/services/observability/modelMonitor';
 import { analyzeCheckin, computeCheckinTrend, CheckinTrend } from '@/services/ai/voiceAnalysis';
+import { computeEmotionalMaturity, MaturitySnapshot } from '@/services/ai/emotionalMaturity';
 import { generateRecommendations } from '@/services/ai/recommendations';
 import {
   HealthConnectService,
@@ -85,6 +87,7 @@ import {
   getLatestBaseline,
   saveCheckin,
   getRecentCheckins,
+  updateCheckinMeta,
   getSleepSessions,
   getRecentFeatureWindows,
   deleteAllData as dbDeleteAllData,
@@ -111,6 +114,7 @@ import {
 import { exportHealthData } from '@/services/ai/dataExport';
 import { configureLLMPreset, isLLMConfigured, getLLMConfig } from '@/services/ai/llmService';
 import { configureWhisper, isWhisperConfigured } from '@/services/ai/whisperService';
+import { checkNemotronHealth } from '@/services/ai/nemotronAsrService';
 import { initializeAIServices } from '@/services/ai/aiConfig';
 import {
   getMockLocationDiversity,
@@ -155,7 +159,10 @@ interface WellnessContextValue {
   lastCheckin: CheckinAnalysis | null;
   checkinHistory: CheckinAnalysis[];
   checkinTrend: CheckinTrend;
-  performCheckin: (transcript: string) => Promise<CheckinAnalysis>;
+  performCheckin: (transcript: string, meta?: Partial<CheckinMeta>) => Promise<CheckinAnalysis>;
+  /** Patch a check-in's meta after the fact — used by the voice duet (voiceAssistant.ts) to record latency/ttsUsed once a turn finishes speaking, which isn't known yet when performCheckin() first saves the analysis. */
+  recordVoiceTurnMeta: (checkinId: string, patch: Partial<CheckinMeta>) => void;
+  emotionalMaturity: MaturitySnapshot;
 
   // Location & Sunlight
   locationDiversity: LocationDiversitySummary | null;
@@ -228,6 +235,7 @@ const DEFAULT_FOCUS: FocusPrediction = {
 
 const DEFAULT_SLEEP_TREND: SleepTrend = { avgQuality: 0, avgDuration: 0, trend: 'stable', daysAnalyzed: 0 };
 const DEFAULT_CHECKIN_TREND: CheckinTrend = { avgSentiment: 0, dominantEmotion: 'calm', trend: 'stable', count: 0 };
+const DEFAULT_MATURITY: MaturitySnapshot = { score: 0, overallTier: 'Just getting to know you', dimensions: [], sampleSize: 0 };
 
 // ============================================================
 // Context
@@ -276,6 +284,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const [lastCheckin, setLastCheckin] = useState<CheckinAnalysis | null>(null);
   const [checkinHistory, setCheckinHistory] = useState<CheckinAnalysis[]>([]);
   const [checkinTrend, setCheckinTrend] = useState<CheckinTrend>(DEFAULT_CHECKIN_TREND);
+  const [emotionalMaturity, setEmotionalMaturity] = useState<MaturitySnapshot>(DEFAULT_MATURITY);
 
   // Weekly chart data
   const [weeklyStress, setWeeklyStress] = useState<{ date: string; value: number }[]>([]);
@@ -915,10 +924,33 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   }
 
   // ============================================================
+  // Emotional Maturity ("how well is Seren reading me")
+  // ============================================================
+  // Recomputed whenever checkinHistory changes, rather than duplicated at
+  // every setCheckinHistory call site (initial load, performCheckin, reset).
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // checkNemotronHealth() is cheap when called repeatedly — it's cached
+      // for 60s (nemotronAsrService.ts) and resolves false instantly when
+      // Nemotron isn't configured at all, which is the common case today.
+      const nemotronAvailable = await checkNemotronHealth();
+      if (cancelled) return;
+      setEmotionalMaturity(computeEmotionalMaturity(checkinHistory, {
+        llmConfigured: isLLMConfigured(),
+        whisperConfigured: isWhisperConfigured(),
+        nemotronAvailable,
+      }));
+    })();
+    return () => { cancelled = true; };
+  }, [checkinHistory]);
+
+  // ============================================================
   // Check-in Handler
   // ============================================================
 
-  const performCheckin = useCallback(async (transcript: string): Promise<CheckinAnalysis> => {
+  const performCheckin = useCallback(async (transcript: string, meta?: Partial<CheckinMeta>): Promise<CheckinAnalysis> => {
     // Build full biometric snapshot for deep AI cross-referencing
     const weeklyStressValues = weeklyStress.map(w => w.value).filter(v => v > 0);
     let stressTrendWeek: string | undefined;
@@ -942,6 +974,18 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       recentMood: lastCheckin?.sentiment,
       stressTrendWeek,
     });
+
+    // Best-effort provenance: which path actually analyzed this transcript.
+    // (analyzeCheckinWithLLM silently falls back to local analysis on API
+    // failure, so this is an approximation of "configured", not a guarantee
+    // of what ran — exact attribution would need llmService.ts to report it.)
+    result.meta = {
+      inputMode: 'text',
+      llmProvider: isLLMConfigured() ? (getLLMConfig()?.provider ?? 'unknown') : 'local',
+      ttsUsed: false,
+      ...meta,
+    };
+
     setLastCheckin(result);
     setCheckinHistory((prev: CheckinAnalysis[]) => {
       const updated = [result, ...prev].slice(0, 50);
@@ -952,6 +996,16 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     if (dbReadyRef.current) saveCheckin(result).catch(() => {});
     return result;
   }, [heartRate, hrv, stress.stressScore]);
+
+  const recordVoiceTurnMeta = useCallback((checkinId: string, patch: Partial<CheckinMeta>) => {
+    setCheckinHistory((prev: CheckinAnalysis[]) => prev.map((c) =>
+      c.id === checkinId ? { ...c, meta: { ...c.meta, ...patch } as CheckinMeta } : c,
+    ));
+    setLastCheckin((prev) =>
+      prev && prev.id === checkinId ? { ...prev, meta: { ...prev.meta, ...patch } as CheckinMeta } : prev,
+    );
+    if (dbReadyRef.current) updateCheckinMeta(checkinId, patch).catch(() => {});
+  }, []);
 
   // ============================================================
   // Actions
@@ -1000,6 +1054,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     setAnomalies([]);
     setSleepTrend(DEFAULT_SLEEP_TREND);
     setCheckinTrend(DEFAULT_CHECKIN_TREND);
+    setEmotionalMaturity(DEFAULT_MATURITY);
     setLocationDiversity(null);
     setSunlightExposure(null);
     setWeeklyLocationDiversity([]);
@@ -1052,7 +1107,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     lastSleep, sleepTrend, baseline, anomalies,
     recommendations, features, heartRate, hrv,
     locationDiversity, sunlightExposure,
-    lastCheckin, checkinHistory, checkinTrend, performCheckin,
+    lastCheckin, checkinHistory, checkinTrend, performCheckin, recordVoiceTurnMeta, emotionalMaturity,
     weeklyStress, weeklyHrv, weeklySleep,
     weeklyLocationDiversity, weeklySunlight,
     monthlySleepGrid, hrvTrendData,
