@@ -1,0 +1,18 @@
+{
+  "model": "depression",
+  "eval_set_id": "depresjon_v1",
+  "cv_accuracy": 0.9231,
+  "cv_precision": 0.8729,
+  "cv_recall": 0.916,
+  "cv_f1": 0.894,
+  "cv_auc_roc": 0.966,
+  "gate": {
+    "primary": "cv_auc_roc",
+    "direction": "max",
+    "min_delta": 0.0,
+    "no_regress": [
+      "cv_accuracy",
+      "cv_f1"
+    ]
+  }
+}
