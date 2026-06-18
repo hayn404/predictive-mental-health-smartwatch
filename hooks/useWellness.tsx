@@ -39,6 +39,7 @@ import {
   BiometricFeatureVector,
   LocationDiversitySummary,
   SunlightExposureSummary,
+  DepressionPrediction,
 } from '@/services/ai/types';
 
 import {
@@ -55,6 +56,11 @@ import {
   getFocusLevel,
 } from '@/services/ai/focusModel';
 import { loadBioAgeModel, predictBioAge, type BioAgePrediction } from '@/services/ai/bioAgeModel';
+import {
+  loadDepressionModel,
+  predictDepression,
+  buildDailyActivityFeatures,
+} from '@/services/ai/depressionModel';
 import { getFocusTips } from '@/services/ai/focusRecommendations';
 import { extractFeatures } from '@/services/ai/featureEngineering';
 import { computeBaseline, shouldRecomputeBaseline, detectAnomalies, AnomalyFlag } from '@/services/ai/baseline';
@@ -128,8 +134,11 @@ interface WellnessContextValue {
   anxiety: AnxietyPrediction;
   focus: FocusPrediction;
   bioAge: BioAgePrediction | null;
+  depression: DepressionPrediction | null;
   chronologicalAge: number | null;
   setChronologicalAge: (age: number | null) => void;
+  gender: number | null;
+  setGender: (g: number | null) => void;
   lastSleep: SleepAnalysis | null;
   sleepTrend: SleepTrend;
   baseline: PersonalBaseline | null;
@@ -241,8 +250,12 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const [anxiety, setAnxiety] = useState<AnxietyPrediction>(DEFAULT_ANXIETY);
   const [focus, setFocus] = useState<FocusPrediction>(DEFAULT_FOCUS);
   const [bioAge, setBioAge] = useState<BioAgePrediction | null>(null);
+  const [depression, setDepression] = useState<DepressionPrediction | null>(null);
   const [chronologicalAge, setChronoState] = useState<number | null>(25);
   const chronoRef = useRef<number | null>(25);
+  const [gender, setGenderState] = useState<number | null>(null);
+  const genderRef = useRef<number | null>(null);
+  const lastDepressionDateRef = useRef<string | null>(null);
   const [lastSleep, setLastSleep] = useState<SleepAnalysis | null>(null);
   const [sleepTrend, setSleepTrend] = useState<SleepTrend>(DEFAULT_SLEEP_TREND);
   const [baseline, setBaseline] = useState<PersonalBaseline | null>(null);
@@ -331,6 +344,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       loadAnxietyModel(anxietyModelJson);
       loadFocusModel(focusModelJson);
       loadBioAgeModel(require('@/assets/ml/bioage/bioage_model.json'));
+      loadDepressionModel(require('@/assets/ml/depression/depression_model.json'));
       setModelLoaded(true);
     } catch (e) {
       console.warn('[Seren] Failed to load ML models:', e);
@@ -454,6 +468,13 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       if (savedAge != null && savedAge !== '') {
         const a = parseInt(savedAge, 10);
         if (!isNaN(a)) { chronoRef.current = a; setChronoState(a); }
+      }
+
+      // Restore gender (for the depression model), if set.
+      const savedGender = await getSetting('gender');
+      if (savedGender != null && savedGender !== '') {
+        const g = parseFloat(savedGender);
+        if (!isNaN(g)) { genderRef.current = g; setGenderState(g); }
       }
 
       await cleanupOldData();
@@ -751,6 +772,24 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       };
       setFocus({ ...focusSmoothed, groqLoading: false });
 
+      // Depression: daily actigraphy signal — compute once per calendar day.
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (lastDepressionDateRef.current !== todayStr) {
+        try {
+          const dayAgo = now - 24 * 60 * 60 * 1000;
+          const daySteps = await service.readSteps(dayAgo, now);
+          const daysAvailable = Math.min(30, Math.ceil(featureHistory.current.length / 288));
+          const dailyFeats = buildDailyActivityFeatures(
+            daySteps, genderRef.current ?? 1.5, chronoRef.current, daysAvailable,
+          );
+          const depPred = predictDepression(dailyFeats);
+          setDepression(depPred);
+          lastDepressionDateRef.current = todayStr;
+        } catch (e) {
+          console.warn('[Seren][Depression] daily prediction failed:', e);
+        }
+      }
+
       // Biological age: a stable trait → aggregate the user's recent windows (median),
       // global-normalize, predict physiological age, derive the age gap vs chronological age.
       const bioAgePred = predictBioAge(featureHistory.current, chronoRef.current);
@@ -927,6 +966,16 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setGender = useCallback((g: number | null) => {
+    genderRef.current = g;
+    setGenderState(g);
+    // Reset the daily gate so the depression model re-runs with the new gender
+    lastDepressionDateRef.current = null;
+    if (dbReadyRef.current) {
+      setSetting('gender', g == null ? '' : String(g)).catch(() => {});
+    }
+  }, []);
+
   const refreshData = useCallback(async () => {
     await runInferenceCycle();
     await fetchSleepData();
@@ -940,6 +989,8 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     setCheckinHistory([]);
     setLastCheckin(null);
     setLastSleep(null);
+    setDepression(null);
+    lastDepressionDateRef.current = null;
     setStress(DEFAULT_STRESS);
     setAnxiety(DEFAULT_ANXIETY);
     setFocus(DEFAULT_FOCUS);
@@ -966,6 +1017,15 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const requestHCPermissions = useCallback(async (): Promise<boolean> => {
     try {
       const realService = createHealthConnectService();
+      const available = await realService.isAvailable();
+      if (!available) {
+        healthService.current = createMockHealthConnectService();
+        dataSourceRef.current = 'mock';
+        setHealthConnectAvailable(false);
+        setWatchConnected(true);
+        return false;
+      }
+
       const granted = await realService.requestPermissions();
       if (granted) {
         healthService.current = realService;
@@ -985,7 +1045,8 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   // ============================================================
 
   const value: WellnessContextValue = {
-    stress, anxiety, focus, bioAge, chronologicalAge, setChronologicalAge,
+    stress, anxiety, focus, bioAge, depression, chronologicalAge, setChronologicalAge,
+    gender, setGender,
     lastSleep, sleepTrend, baseline, anomalies,
     recommendations, features, heartRate, hrv,
     locationDiversity, sunlightExposure,

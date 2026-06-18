@@ -23,7 +23,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { watchConnected, lastSyncTime, deleteAllData, exportData, requestHealthConnectPermissions, healthConnectAvailable,
-    chronologicalAge, setChronologicalAge } = useWellness();
+    chronologicalAge, setChronologicalAge, gender, setGender } = useWellness();
   const { showAlert } = useAlert();
   const { user, logout } = useAuth();
 
@@ -53,6 +53,12 @@ export default function SettingsScreen() {
     const a = parseInt(ageInput, 10);
     setChronologicalAge(isNaN(a) || a < 5 || a > 120 ? null : a);
   };
+
+  const GENDER_OPTIONS = [
+    { label: 'M', fullLabel: 'Male',              value: 1   },
+    { label: 'F', fullLabel: 'Female',            value: 2   },
+    { label: '—', fullLabel: 'Prefer not to say', value: 1.5 },
+  ] as const;
 
   const [onDevice, setOnDevice] = useState(true);
   const [notifications, setNotifications] = useState(true);
@@ -208,6 +214,30 @@ export default function SettingsScreen() {
               placeholderTextColor={Colors.textMuted}
               returnKeyType="done"
             />
+          </View>
+          <View style={styles.rowDivider} />
+          <View style={styles.settingRow}>
+            <View style={[styles.settingIcon, { backgroundColor: Colors.violet + '18' }]}>
+              <MaterialIcons name="wc" size={18} color={Colors.violet} />
+            </View>
+            <View style={[styles.settingText, { flex: 1 }]}>
+              <Text style={styles.settingLabel}>Gender</Text>
+              <Text style={styles.settingSubLabel}>Used for mood-risk screening</Text>
+            </View>
+            <View style={styles.genderPicker}>
+              {GENDER_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={String(opt.value)}
+                  style={[styles.genderChip, gender === opt.value && styles.genderChipActive]}
+                  onPress={() => setGender(opt.value)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.genderChipText, gender === opt.value && styles.genderChipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </GlassCard>
 
@@ -681,5 +711,30 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.violet,
     fontWeight: 'bold',
+  },
+  genderPicker: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  genderChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+    borderWidth: 1.5,
+    borderColor: Colors.warmGray300,
+    backgroundColor: Colors.warmWhite,
+  },
+  genderChipActive: {
+    borderColor: Colors.violet,
+    backgroundColor: Colors.violetMuted,
+  },
+  genderChipText: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  genderChipTextActive: {
+    color: Colors.violet,
+    fontWeight: '700',
   },
 });

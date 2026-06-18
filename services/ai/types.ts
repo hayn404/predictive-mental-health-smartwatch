@@ -555,3 +555,83 @@ export interface DBSunlightDaily {
   avg_outdoor_lux: number;
   goal_minutes: number;
 }
+
+// ----------------------------------------------------------
+// DEPRESSION RISK MODEL
+// ----------------------------------------------------------
+
+/**
+ * Daily actigraphy feature vector — input to the depression model.
+ * Feature order matches the Depresjon training dataset exactly.
+ * Computed from a rolling 24h window of Health Connect step/activity data.
+ */
+export interface DailyActivityFeatures {
+  // ---- Basic statistics ----
+  mean_activity: number;
+  std_activity: number;
+  median_activity: number;
+  max_activity: number;
+  min_activity: number;
+  activity_range: number;
+  activity_cv: number;           // coefficient of variation (std / mean)
+
+  // ---- Percentiles ----
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+
+  // ---- Activity levels ----
+  inactive_minutes: number;      // minutes with activity < 20 counts
+  active_minutes: number;        // minutes with activity > 200 counts
+  very_active_minutes: number;   // minutes with activity > 500 counts
+
+  // ---- Circadian rhythm ----
+  day_mean: number;              // mean activity 07:00–22:00
+  night_mean: number;            // mean activity 22:00–07:00
+  day_night_ratio: number;       // day_mean / (night_mean + 1)
+
+  // ---- Sleep proxy ----
+  longest_rest_period: number;   // longest run of inactive (<20) minutes
+  rest_period_count: number;     // number of rest periods
+
+  // ---- Complexity ----
+  activity_entropy: number;      // Shannon entropy of activity histogram
+
+  // ---- Subject metadata ----
+  gender: number;                // 1 = male, 2 = female, 1.5 = unknown
+  days: number;                  // days of data available (rolling window)
+  age_num: number;               // chronological age in years
+}
+
+export const DEPRESSION_FEATURE_NAMES: (keyof DailyActivityFeatures)[] = [
+  'mean_activity', 'std_activity', 'median_activity', 'max_activity', 'min_activity',
+  'activity_range', 'activity_cv',
+  'p10', 'p25', 'p50', 'p75', 'p90',
+  'inactive_minutes', 'active_minutes', 'very_active_minutes',
+  'day_mean', 'night_mean', 'day_night_ratio',
+  'longest_rest_period', 'rest_period_count', 'activity_entropy',
+  'gender', 'days', 'age_num',
+];
+
+export type DepressionRiskLevel = 'minimal' | 'mild' | 'moderate' | 'high';
+
+export interface DepressionContributor {
+  feature: string;
+  label: string;
+  value: number;
+  impact: number;        // 0–1 importance weight
+  direction: 'high' | 'low';
+}
+
+/** Depression risk prediction from daily actigraphy */
+export interface DepressionPrediction {
+  timestamp: number;
+  probability: number;           // 0–1 raw model output
+  riskScore: number;             // 0–100 (probability × 100)
+  riskLevel: DepressionRiskLevel;
+  topContributors: DepressionContributor[];
+  dataQuality: 'good' | 'partial' | 'mock';
+  daysOfData: number;
+}

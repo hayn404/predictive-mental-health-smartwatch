@@ -16,11 +16,18 @@ import { Colors, FontSize, FontWeight, Spacing, Radius } from '@/constants/theme
 import { Image } from 'expo-image';
 import { useWellness } from '@/hooks/useWellness';
 
+const GENDER_OPTIONS = [
+    { label: 'Male',                value: 1   },
+    { label: 'Female',              value: 2   },
+    { label: 'Prefer not to say',   value: 1.5 },
+] as const;
+
 export default function ProfileScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { setChronologicalAge } = useWellness();
+    const { setChronologicalAge, setGender } = useWellness();
     const [age, setAge] = useState('');
+    const [selectedGender, setSelectedGender] = useState<number | null>(null);
     const [error, setError] = useState('');
 
     const handleNext = () => {
@@ -29,7 +36,8 @@ export default function ProfileScreen() {
             setError('Please enter a valid age (5–120).');
             return;
         }
-        setChronologicalAge(a);            // persisted on-device (chronological_age)
+        setChronologicalAge(a);
+        setGender(selectedGender ?? 1.5);
         router.push('/onboarding/sync');
     };
 
@@ -61,8 +69,8 @@ export default function ProfileScreen() {
 
                         <Text style={styles.heading}>A little about you.</Text>
                         <Text style={styles.subtitle}>
-                            Your age personalizes your physiological &quot;heart age&quot; and the
-                            age-gap insight. It stays on your device.
+                            Your age and gender personalise your physiological insights and
+                            mood-risk screening. Both stay on your device.
                         </Text>
                     </View>
 
@@ -80,6 +88,31 @@ export default function ProfileScreen() {
                             onSubmitEditing={handleNext}
                         />
                         {error ? <Text style={styles.error}>{error}</Text> : null}
+                    </View>
+
+                    <View style={styles.field}>
+                        <Text style={styles.label}>Gender</Text>
+                        <Text style={styles.sublabel}>Used for activity-based mood screening</Text>
+                        <View style={styles.genderRow}>
+                            {GENDER_OPTIONS.map(opt => (
+                                <TouchableOpacity
+                                    key={String(opt.value)}
+                                    style={[
+                                        styles.genderBtn,
+                                        selectedGender === opt.value && styles.genderBtnActive,
+                                    ]}
+                                    onPress={() => setSelectedGender(opt.value)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={[
+                                        styles.genderBtnText,
+                                        selectedGender === opt.value && styles.genderBtnTextActive,
+                                    ]}>
+                                        {opt.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
 
                     <TouchableOpacity style={styles.startButton} onPress={handleNext}>
@@ -108,6 +141,7 @@ const styles = StyleSheet.create({
     subtitle: { fontSize: FontSize.md, color: Colors.textSecondary, lineHeight: 24 },
     field: { paddingHorizontal: Spacing.xl, marginBottom: Spacing.xl },
     label: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.textPrimary, marginBottom: Spacing.sm },
+    sublabel: { fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.sm },
     input: {
         backgroundColor: Colors.warmWhite,
         borderRadius: Radius.md,
@@ -119,6 +153,21 @@ const styles = StyleSheet.create({
         borderColor: Colors.warmGray300,
     },
     error: { color: Colors.error, fontSize: FontSize.sm, marginTop: Spacing.sm },
+    genderRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
+    genderBtn: {
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.sm,
+        borderRadius: Radius.full,
+        borderWidth: 1.5,
+        borderColor: Colors.warmGray300,
+        backgroundColor: Colors.warmWhite,
+    },
+    genderBtnActive: {
+        borderColor: Colors.violet,
+        backgroundColor: Colors.violetMuted,
+    },
+    genderBtnText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: '500' },
+    genderBtnTextActive: { color: Colors.violet, fontWeight: '700' },
     startButton: {
         flexDirection: 'row',
         backgroundColor: Colors.sageGreen,
