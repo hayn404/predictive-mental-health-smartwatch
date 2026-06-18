@@ -125,11 +125,12 @@ def ensure_kaggle_auth():
     """Write ~/.kaggle/kaggle.json from KAGGLE_USERNAME/KAGGLE_KEY.
     The Kaggle CLI reads this file reliably across versions (the 1.7+ CLI no
     longer auto-picks up the env vars for non-interactive use)."""
-    u = os.environ.get("KAGGLE_USERNAME")
-    k = os.environ.get("KAGGLE_KEY")
+    u = (os.environ.get("KAGGLE_USERNAME") or "").strip()
+    k = (os.environ.get("KAGGLE_KEY") or "").strip()
     if not (u and k):
         print("WARN: KAGGLE_USERNAME / KAGGLE_KEY not set in env")
         return
+    print(f"Kaggle auth: user={u!r}, key length={len(k)}")
     kdir = Path.home() / ".kaggle"
     kdir.mkdir(parents=True, exist_ok=True)
     kf = kdir / "kaggle.json"
