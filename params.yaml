@@ -2,13 +2,21 @@
 # block + `dvc repro` re-trains only that stage. Mirrors the PSO-tuned values.
 
 sleep:
-  lr: 0.00088
-  dropout: 0.20
-  lstm_hidden: 48
+  # PSO-best HPs baked into the Kaggle notebook (seren_sleep_kaggle.ipynb v3.2)
+  lr: 1.03e-3
+  dropout: 0.258
+  lstm_hidden: 48        # parameterizes the BiGRU
   seq_len: 41
   train_stride: 5
-  weight_decay: 1.0e-5
+  weight_decay: 1.72e-5
   epochs: 80
+  early_stop_patience: 15
+  val_split: 0.15
+  batch_size: 64
+  tcn_channels: 64
+  tcn_kernel: 5
+  lstm_layers: 2
+  seed: 42
   arch: tcn_bigru_bn_v1
 
 stress:
@@ -18,12 +26,17 @@ stress:
   learning_rate: 0.1
   subsample: 0.8
   colsample_bytree: 0.8
-  window_sec: 300
+  window_sec: 60
   label_purity: 0.8
   cv_strategy: loso          # leave-one-subject-out for the dev metric
-  train_on: SIPD             # dev datasets (SIPD + PhysioStress fusion)
+  train_on: SIPD+PhysioStress
+  use_physiostress: true
   final_test: WESAD          # held-out cross-dataset test
   normalization: per_subject
+  threshold_objective: prior # base-rate matching for cross-dataset transfer
+  run_tuning: true           # PSO/GWO hyperparameter search (matches notebook)
+  tune_pop: 8
+  tune_iters: 12
 
 # Fill these in as you wire each model's train stage into dvc.yaml.
 # focus:

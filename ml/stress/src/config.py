@@ -25,11 +25,32 @@ class DataConfig:
     swell_csv: str = "/app/data/swell/swell_hrv.csv"
     features_csv: str = "/app/data/wesad_features.csv"
     windows_pkl: str = "/app/data/wesad_windows.pkl"
-    window_sec: int = 300
+    window_sec: int = 60        # 60-s windows match watch polling cadence (notebook default)
     overlap: float = 0.0
     label_purity: float = 0.8
 
-    # Synthetic data settings
+    # Dataset selection — mirrors notebook TRAIN_ON / EVAL_ON / USE_* flags
+    train_on: str = "SIPD+PhysioStress"   # "+"-joined fusion; SIPD+PhysioStress is the thesis config
+    eval_on: str = "WESAD"                # held-out cross-dataset test set
+    use_physiostress: bool = True
+    physiostress_dir: str = "/app/data/physiostress"
+
+    # Feature set flags — must match notebook USE_FREQ_DOMAIN / USE_MORPHOLOGY
+    normalization: str = "per_subject"    # "global" | "per_subject"
+    use_freq_domain: bool = False         # 7 Welch PSD features — off = 14-feature lean model
+    use_morphology: bool = False          # 8 PPG pulse-shape features — off for watch compat
+
+    # Threshold calibration
+    calibrate_threshold: bool = True
+    threshold_objective: str = "prior"   # "prior" | "f1" | "youden" | "balanced"
+
+    # Hyperparameter tuning (nature-inspired PSO/GWO, matches notebook)
+    run_tuning: bool = True
+    tuners: tuple = ("pso", "gwo")       # higher-CV-AUC one wins
+    tune_pop: int = 8
+    tune_iters: int = 12
+
+    # Synthetic data fallback (CI smoke-test only)
     n_subjects: int = 15
     windows_per_subject: int = 40
     stress_ratio: float = 0.35
@@ -105,6 +126,18 @@ def load_config(config_path: Optional[str] = None) -> PipelineConfig:
     cfg.data.window_sec = data.get("window_sec", cfg.data.window_sec)
     cfg.data.overlap = data.get("overlap", cfg.data.overlap)
     cfg.data.label_purity = data.get("label_purity", cfg.data.label_purity)
+    cfg.data.train_on = os.environ.get("TRAIN_ON", data.get("train_on", cfg.data.train_on))
+    cfg.data.eval_on = os.environ.get("EVAL_ON", data.get("final_test", cfg.data.eval_on))
+    cfg.data.use_physiostress = data.get("use_physiostress", cfg.data.use_physiostress)
+    cfg.data.physiostress_dir = os.environ.get("PHYSIOSTRESS_DIR", data.get("physiostress_dir", cfg.data.physiostress_dir))
+    cfg.data.normalization = os.environ.get("NORMALIZATION", data.get("normalization", cfg.data.normalization))
+    cfg.data.use_freq_domain = data.get("use_freq_domain", cfg.data.use_freq_domain)
+    cfg.data.use_morphology = data.get("use_morphology", cfg.data.use_morphology)
+    cfg.data.calibrate_threshold = data.get("calibrate_threshold", cfg.data.calibrate_threshold)
+    cfg.data.threshold_objective = data.get("threshold_objective", cfg.data.threshold_objective)
+    cfg.data.run_tuning = data.get("run_tuning", cfg.data.run_tuning)
+    cfg.data.tune_pop = int(data.get("tune_pop", cfg.data.tune_pop))
+    cfg.data.tune_iters = int(data.get("tune_iters", cfg.data.tune_iters))
 
     syn = data.get("synthetic", {})
     cfg.data.n_subjects = syn.get("n_subjects", cfg.data.n_subjects)

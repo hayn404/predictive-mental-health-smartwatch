@@ -42,7 +42,18 @@ ml/.venv/
 ml/.pytest_cache/
 ml/src/__pycache__/
 ml/tests/__pycache__/
-ml/data/
+# Ignore raw datasets under ml/data, but step-wise re-include the small
+# extracted stress feature CSVs (needed by CI training). Git can't re-include a
+# file whose parent dir is excluded, so each level excludes /* then re-includes.
+ml/data/*
+!ml/data/features/
+ml/data/features/*
+!ml/data/features/stress/
+ml/data/features/stress/*
+!ml/data/features/stress/*.csv
+!ml/data/features/depression/
+ml/data/features/depression/*
+!ml/data/features/depression/*.csv
 ml/**/models/*.joblib
 ml/models/*.joblib
 __pycache__/
@@ -53,8 +64,15 @@ wearos/.idea/
 android/
 .env
 
-# Large ML training data (download from the dataset sources; see model cards)
+# Large ML training data (download from the dataset sources; see model cards).
+# Keep the small extracted feature CSVs (focus/bioage) — raw subfolders stay out.
 ml/*/data/
+!ml/focus/data/
+ml/focus/data/*
+!ml/focus/data/*.csv
+!ml/bioage/data/
+ml/bioage/data/*
+!ml/bioage/data/*.csv
 # Generated native iOS project (Expo managed workflow)
 /ios/
 # Logs and Office temp/lock files
