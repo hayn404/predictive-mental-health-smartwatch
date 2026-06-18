@@ -17,11 +17,19 @@ import { StressGauge } from '@/components/ui/StressGauge';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Hypnogram } from '@/components/ui/Hypnogram';
 import { ageGapMessage } from '@/services/ai/bioAgeModel';
+import type { DepressionRiskLevel } from '@/services/ai/types';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { stress, anxiety, lastSleep, heartRate, recommendations, sunlightExposure, locationDiversity, bioAge } = useWellness();
+  const { stress, anxiety, lastSleep, heartRate, recommendations, sunlightExposure, locationDiversity, bioAge, depression } = useWellness();
+
+  const depressionLevelColor: Record<DepressionRiskLevel, string> = {
+    minimal:  '#35e27e',
+    mild:     '#9B8EC4',
+    moderate: '#E8A87C',
+    high:     '#C4897B',
+  };
   const { user } = useAuth();
   const displayName = user?.username || user?.email?.split('@')[0] || 'there';
 
@@ -108,6 +116,48 @@ export default function HomeScreen() {
             <Text style={styles.bioAgeMsg}>Gathering signal to estimate your physiological age…</Text>
           )}
         </View>
+
+        {/* Mood Risk Card */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push('/depression' as any)}
+        >
+          <View style={styles.depressionCard}>
+            <View style={styles.depressionHeaderRow}>
+              <MaterialIcons name="self-improvement" size={16} color={Colors.violet} />
+              <Text style={styles.depressionTitle}>Mood Risk</Text>
+              <View style={styles.depressionPill}>
+                <Text style={styles.depressionPillText}>ACTIGRAPHY</Text>
+              </View>
+            </View>
+            {depression ? (
+              <>
+                <View style={styles.depressionValueRow}>
+                  <Text style={[styles.depressionValue, { color: depressionLevelColor[depression.riskLevel] }]}>
+                    {depression.riskLevel.charAt(0).toUpperCase() + depression.riskLevel.slice(1)}
+                  </Text>
+                  <View style={[styles.depressionScoreBadge, { backgroundColor: depressionLevelColor[depression.riskLevel] + '22' }]}>
+                    <Text style={[styles.depressionScoreText, { color: depressionLevelColor[depression.riskLevel] }]}>
+                      {depression.riskScore}/100
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.depressionMsg}>
+                  {depression.riskLevel === 'minimal'
+                    ? 'Your activity patterns look healthy. Keep it up.'
+                    : depression.riskLevel === 'mild'
+                    ? 'Minor irregularities in your activity pattern detected.'
+                    : depression.riskLevel === 'moderate'
+                    ? 'Your routine shows patterns linked to low mood. Consider a check-in.'
+                    : 'Significant activity disruption detected. Consider the PHQ-9 screening.'}
+                </Text>
+                <Text style={styles.depressionDisclaimer}>Wellness screening only — not a clinical diagnosis</Text>
+              </>
+            ) : (
+              <Text style={styles.depressionMsg}>Gathering daily activity data for mood screening…</Text>
+            )}
+          </View>
+        </TouchableOpacity>
 
         {/* Secondary Metrics Grid */}
         <View style={styles.metricsGrid}>
@@ -284,6 +334,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F0E9E0',
   },
+  depressionCard: {
+    backgroundColor: Colors.warmWhite,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.violetMuted,
+  },
+  depressionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  depressionTitle: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, flex: 1 },
+  depressionPill: { backgroundColor: Colors.violetMuted, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  depressionPillText: { fontSize: 10, fontWeight: '600', color: Colors.violet, letterSpacing: 0.5 },
+  depressionValueRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+  depressionValue: { fontSize: 28, fontWeight: '700' },
+  depressionScoreBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  depressionScoreText: { fontSize: 12, fontWeight: '700' },
+  depressionMsg: { fontSize: 12.5, color: Colors.textSecondary, lineHeight: 18 },
+  depressionDisclaimer: { fontSize: 10, color: Colors.textMuted, marginTop: 6, fontStyle: 'italic' },
   bioAgeHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   bioAgeTitle: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, flex: 1 },
   bioAgePill: { backgroundColor: '#F1EFE8', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },

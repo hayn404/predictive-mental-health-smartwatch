@@ -18,8 +18,10 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.MoodBad
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.runtime.Composable
@@ -170,6 +172,26 @@ fun DashboardScreen(
                     subtitle = if (state.anxietySustained) "Sustained" else "Trend normal",
                     onClick = onAnxietyTap,
                 )
+            }
+
+            // Mood Risk (phone-computed depression screening)
+            if (state.moodRiskScore >= 0) {
+                item {
+                    val moodColor = when (state.moodRiskLevel) {
+                        "minimal"  -> Color(0xFF35e27e)
+                        "mild"     -> Color(0xFF9B8EC4)
+                        "moderate" -> Color(0xFFE8A87C)
+                        "high"     -> Color(0xFFC4897B)
+                        else       -> SerenColors.textMuted
+                    }
+                    MetricChip(
+                        icon = Icons.Default.MoodBad,
+                        iconColor = moodColor,
+                        label = "Mood Risk",
+                        value = state.moodRiskLevel.replaceFirstChar { it.uppercaseChar() },
+                        subtitle = "${state.moodRiskScore}/100 · from phone",
+                    )
+                }
             }
 
             // Sleep

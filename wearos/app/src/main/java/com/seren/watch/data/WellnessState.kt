@@ -39,6 +39,11 @@ data class WellnessState(
     val weeklySleep: List<Int> = emptyList(),
     val weeklySunlight: List<Int> = emptyList(),
 
+    // Mood risk — computed by the phone XGBoost model, pushed via Data Layer
+    val moodRiskScore: Int = -1,            // -1 = not yet received from phone
+    val moodRiskLevel: String = "",         // "minimal" | "mild" | "moderate" | "high"
+    val moodRiskProbability: Double = -1.0,
+
     val isMonitoring: Boolean = false,
     val lastUpdated: Long = System.currentTimeMillis(),
 )
