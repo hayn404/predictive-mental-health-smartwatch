@@ -10,14 +10,16 @@
 
 stages:
   train_sleep:
-    cmd: python ml/sleep/train.py --params params.yaml --data data/sleep
+    cmd: python ml/sleep/train.py --params params.yaml --data ml/data/features/sleep
          --out assets/ml/sleep --metrics ml/sleep/metrics.json
     deps:
       - ml/sleep/train.py
       - ml/sleep/model.py
       - ml/sleep/dataset.py
-      - data/sleep/bidsleep_features.pkl
-      - data/sleep/walch_features.pkl
+      - ml/sleep/config.py
+      - ml/sleep/convert_onnx_to_tflite.py
+      - ml/data/features/sleep/bidsleep_features.pkl
+      - ml/data/features/sleep/walch_features.pkl
     params:
       - sleep
     outs:
@@ -28,13 +30,15 @@ stages:
           cache: false
 
   train_stress:
-    cmd: python ml/stress/src/train.py --params params.yaml --data data/stress
+    cmd: python ml/stress/src/train.py --params params.yaml --data ml/data/features/stress
          --out assets/ml/stress --metrics ml/stress/metrics.json
     deps:
       - ml/stress/src/train.py
       - ml/stress/src/features.py
-      - ml/stress/src/preprocessing.py
-      - data/stress
+      - ml/stress/src/config.py
+      - ml/data/features/stress/sipd_features.csv
+      - ml/data/features/stress/physiostress_features.csv
+      - ml/data/features/stress/wesad_features.csv
     params:
       - stress
     outs:

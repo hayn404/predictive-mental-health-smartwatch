@@ -1,12 +1,16 @@
-# CI training + gate deps (self-hosted runner). Extends ml/requirements.txt.
+# CI training + gate deps. Extends ml/requirements.txt.
 -r ../requirements.txt
 
-# Data/experiment versioning
-dvc[s3]>=3.0
-dagshub
+# Experiment tracking
+mlflow>=2.10
 
-# Sleep deep model (GPU on the self-hosted runner)
-torch
-captum
-onnx
-onnxruntime
+# Kaggle GPU orchestration (sleep model is offloaded to a Kaggle T4 kernel;
+# the runner only pushes/polls/downloads — no torch needed on the runner)
+kaggle>=1.6
+
+# Figures (confusion/ROC/feature-importance/SHAP) for CPU models on the runner
+shap>=0.44
+
+# Data/experiment versioning (optional — the CI flow uses git + Kaggle, not DVC)
+# dvc[s3]>=3.0
+# dagshub
