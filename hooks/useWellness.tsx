@@ -61,6 +61,7 @@ import {
   predictDepression,
   buildDailyActivityFeatures,
 } from '@/services/ai/depressionModel';
+import { sendDepressionToWatch } from '@/services/wearDepressionBridge';
 import { getFocusTips } from '@/services/ai/focusRecommendations';
 import { extractFeatures } from '@/services/ai/featureEngineering';
 import { computeBaseline, shouldRecomputeBaseline, detectAnomalies, AnomalyFlag } from '@/services/ai/baseline';
@@ -785,6 +786,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
           const depPred = predictDepression(dailyFeats);
           setDepression(depPred);
           lastDepressionDateRef.current = todayStr;
+          sendDepressionToWatch(depPred).catch(() => {});
         } catch (e) {
           console.warn('[Seren][Depression] daily prediction failed:', e);
         }

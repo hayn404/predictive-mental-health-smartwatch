@@ -64,7 +64,8 @@
           "motionPermission": "Seren uses motion sensors to detect activity levels."
         }
       ],
-      "./plugins/withHealthConnect"
+      "./plugins/withHealthConnect",
+      "./plugins/withWearableDepression"
     ],
     "experiments": {
       "typedRoutes": true

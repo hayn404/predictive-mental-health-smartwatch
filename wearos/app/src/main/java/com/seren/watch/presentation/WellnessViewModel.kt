@@ -1,8 +1,13 @@
 package com.seren.watch.presentation
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.wearable.DataClient
+import com.google.android.gms.wearable.DataEventBuffer
+import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.Wearable
 import com.seren.watch.data.AnxietyLevel
 import com.seren.watch.data.StressLevel
 import com.seren.watch.data.WatchRecommendation
@@ -18,15 +23,63 @@ import kotlinx.coroutines.launch
  * ViewModel for the Seren Wear OS app.
  * Manages health data collection and wellness state.
  */
-class WellnessViewModel(application: Application) : AndroidViewModel(application) {
+class WellnessViewModel(application: Application) : AndroidViewModel(application),
+    DataClient.OnDataChangedListener {
+
+    companion object {
+        private const val TAG = "SerenWatchVM"
+        private const val DEPRESSION_PATH = "/seren/depression"
+    }
 
     private val healthManager = HealthServicesManager(application)
+    private val dataClient = Wearable.getDataClient(application)
 
     private val _state = MutableStateFlow(WellnessState())
     val state: StateFlow<WellnessState> = _state.asStateFlow()
 
     private val _isPermissionGranted = MutableStateFlow(false)
     val isPermissionGranted: StateFlow<Boolean> = _isPermissionGranted.asStateFlow()
+
+    init {
+        // Register for phone→watch Data Layer updates (e.g. depression risk)
+        dataClient.addListener(this)
+        // Read any existing DataItem the phone pushed while the watch was off
+        dataClient.getDataItems().addOnSuccessListener { items ->
+            for (item in items) {
+                if (item.uri.path == DEPRESSION_PATH) applyDepressionItem(DataMapItem.fromDataItem(item))
+            }
+            items.release()
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        dataClient.removeListener(this)
+    }
+
+    // ── DataClient.OnDataChangedListener ─────────────────────────────────────
+
+    override fun onDataChanged(events: DataEventBuffer) {
+        for (event in events) {
+            if (event.dataItem.uri.path == DEPRESSION_PATH) {
+                applyDepressionItem(DataMapItem.fromDataItem(event.dataItem))
+            }
+        }
+        events.release()
+    }
+
+    private fun applyDepressionItem(item: DataMapItem) {
+        val map = item.dataMap
+        val score = map.getInt("riskScore", -1)
+        val level = map.getString("riskLevel") ?: ""
+        val prob  = map.getDouble("probability", -1.0)
+        Log.d(TAG, "Depression received from phone: $level ($score/100)")
+        _state.value = _state.value.copy(
+            moodRiskScore       = score,
+            moodRiskLevel       = level,
+            moodRiskProbability = prob,
+        )
+    }
 
     fun onPermissionGranted() {
         _isPermissionGranted.value = true
