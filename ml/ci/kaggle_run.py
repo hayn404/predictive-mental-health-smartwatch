@@ -166,6 +166,29 @@ def kaggle(*args, **kw):
         return sh([sys.executable, "-m", "kaggle", *args], **kw)
 
 
+def dump_kernel_log(slug):
+    """Fetch the kernel's execution log and print it (so failures are visible
+    in the GitHub Actions console, not just on Kaggle)."""
+    d = Path("kernel_log"); d.mkdir(exist_ok=True)
+    try:
+        kaggle("kernels", "output", slug, "-p", str(d))
+    except Exception as e:
+        print(f"(could not fetch kernel log: {e})")
+        return
+    logs = list(d.glob("*.log"))
+    if not logs:
+        print("(no .log file in kernel output)")
+        return
+    txt = logs[0].read_text(errors="replace")
+    print(f"\n===== KAGGLE KERNEL LOG ({logs[0].name}) =====")
+    try:
+        for e in json.loads(txt):            # Kaggle log = JSON list of {stream,data}
+            print(e.get("data", ""), end="")
+    except Exception:
+        print(txt[-12000:])
+    print("\n===== END KERNEL LOG =====")
+
+
 def push_and_wait(workdir, slug, timeout):
     kaggle("kernels", "push", "-p", str(workdir))
     t0 = time.time()
@@ -178,8 +201,10 @@ def push_and_wait(workdir, slug, timeout):
         if "complete" in low:
             return
         if "error" in low or "cancel" in low:
+            dump_kernel_log(slug)
             sys.exit(f"Kaggle kernel failed: {out}")
         if time.time() - t0 > timeout:
+            dump_kernel_log(slug)
             sys.exit("Kaggle kernel timed out")
 
 
