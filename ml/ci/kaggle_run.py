@@ -122,24 +122,36 @@ MODELS = {
 
 
 def ensure_kaggle_auth():
-    """Write ~/.kaggle/kaggle.json from KAGGLE_USERNAME/KAGGLE_KEY.
-    The Kaggle CLI reads this file reliably across versions (the 1.7+ CLI no
-    longer auto-picks up the env vars for non-interactive use)."""
-    u = (os.environ.get("KAGGLE_USERNAME") or "").strip()
-    k = (os.environ.get("KAGGLE_KEY") or "").strip()
-    if not (u and k):
-        print("WARN: KAGGLE_USERNAME / KAGGLE_KEY not set in env")
-        return
-    print(f"Kaggle auth: user={u!r}, key length={len(k)}")
+    """Set up Kaggle credentials for the CLI, supporting both auth styles:
+      - NEW API token  -> KAGGLE_API_TOKEN  (CLI >= 1.8; written to ~/.kaggle/access_token)
+      - LEGACY key      -> KAGGLE_USERNAME + KAGGLE_KEY (written to ~/.kaggle/kaggle.json)
+    """
     kdir = Path.home() / ".kaggle"
     kdir.mkdir(parents=True, exist_ok=True)
-    kf = kdir / "kaggle.json"
-    kf.write_text(json.dumps({"username": u, "key": k}))
-    try:
-        os.chmod(kf, 0o600)
-    except OSError:
-        pass
-    print(f"Wrote {kf}")
+    tok = (os.environ.get("KAGGLE_API_TOKEN") or "").strip()
+    u = (os.environ.get("KAGGLE_USERNAME") or "").strip()
+    k = (os.environ.get("KAGGLE_KEY") or "").strip()
+
+    if tok:
+        os.environ["KAGGLE_API_TOKEN"] = tok
+        af = kdir / "access_token"
+        af.write_text(tok)
+        try:
+            os.chmod(af, 0o600)
+        except OSError:
+            pass
+        print(f"Kaggle auth: API token (length={len(tok)}), user={u!r}")
+        return
+    if u and k:
+        kf = kdir / "kaggle.json"
+        kf.write_text(json.dumps({"username": u, "key": k}))
+        try:
+            os.chmod(kf, 0o600)
+        except OSError:
+            pass
+        print(f"Kaggle auth: legacy user={u!r}, key length={len(k)}")
+        return
+    print("WARN: no Kaggle credentials (set KAGGLE_API_TOKEN, or KAGGLE_USERNAME+KAGGLE_KEY)")
 
 
 def sh(cmd, **kw):

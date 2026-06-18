@@ -6,9 +6,9 @@ mlflow>=2.10
 
 # Kaggle GPU orchestration (sleep model is offloaded to a Kaggle T4 kernel;
 # the runner only pushes/polls/downloads — no torch needed on the runner).
-# Pinned <1.7: the 1.7+ CLI switched to an OAuth flow that breaks headless
-# KAGGLE_USERNAME/KAGGLE_KEY auth in CI.
-kaggle>=1.6,<1.7
+# >=1.8 supports the new API tokens (KAGGLE_API_TOKEN); still reads the legacy
+# ~/.kaggle/kaggle.json (username+key) that kaggle_run.py writes.
+kaggle>=1.8
 
 # Figures (confusion/ROC/feature-importance/SHAP) for CPU models on the runner
 shap>=0.44
