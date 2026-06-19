@@ -30,6 +30,7 @@ from sklearn.metrics import (accuracy_score, f1_score, matthews_corrcoef,
 warnings.filterwarnings("ignore")
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ci"))
 import viz  # noqa: E402
+from bootstrap import bootstrap_ci  # noqa: E402
 
 FEATURES = ["meanRR", "sdnn", "rmssd", "pnn50", "pnn20", "hrMean", "hrStd", "hrRange", "cvRR",
             "sd1", "sd2", "sd1sd2Ratio", "sampleEntropy", "dfaAlpha1"]
@@ -61,14 +62,14 @@ def per_user_normalize(df, feats):
 
 def loso_eval(X, y, groups):
     logo = LeaveOneGroupOut()
-    yt, yp, ypr = [], [], []
+    yt, yp, ypr, gg = [], [], [], []
     for tr, te in logo.split(X, y, groups):
         pos = max(1, (y[tr] == 1).sum()); neg = max(1, (y[tr] == 0).sum())
         m = xgb.XGBClassifier(**PARAMS, scale_pos_weight=neg / pos)
         m.fit(X[tr], y[tr])
         p = m.predict_proba(X[te])[:, 1]
-        yt.extend(y[te]); ypr.extend(p); yp.extend((p >= 0.5).astype(int))
-    return map(np.array, (yt, yp, ypr))
+        yt.extend(y[te]); ypr.extend(p); yp.extend((p >= 0.5).astype(int)); gg.extend(groups[te])
+    return map(np.array, (yt, yp, ypr, gg))
 
 
 def fix_splits(node, idx_to_name):
@@ -168,12 +169,13 @@ def main():
 
     dn = per_user_normalize(df, feats)
     X = dn[feats].to_numpy(float)
-    yt, yp, ypr = loso_eval(X, y, groups)
+    yt, yp, ypr, gg = loso_eval(X, y, groups)
     metrics = {
         "loso_acc": round(float(accuracy_score(yt, yp)), 4),
         "loso_f1": round(float(f1_score(yt, yp, zero_division=0)), 4),
         "loso_mcc": round(float(matthews_corrcoef(yt, yp)), 4),
         "loso_auc": round(float(roc_auc_score(yt, ypr)), 4),
+        "loso_auc_ci95": bootstrap_ci(roc_auc_score, yt, ypr, groups=gg),
     }
     print("LOSO metrics:", metrics)
 

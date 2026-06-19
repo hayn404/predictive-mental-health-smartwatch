@@ -29,6 +29,7 @@ from sklearn.metrics import mean_absolute_error, r2_score, roc_auc_score
 warnings.filterwarnings("ignore")
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ci"))
 import viz  # noqa: E402
+from bootstrap import bootstrap_ci  # noqa: E402
 
 FEAT = ["meanRR", "sdnn", "rmssd", "pnn50", "pnn20", "hrMean", "cvRR",
         "sd1", "sd2", "sd1sd2Ratio", "sampleEntropy", "dfaAlpha1"]
@@ -153,6 +154,7 @@ def main():
         "loso_mae_years": round(float(mean_absolute_error(yt, yp)), 4),
         "loso_r": round(float(np.corrcoef(yt, yp)[0, 1]), 4),
         "loso_r2": round(float(r2_score(yt, yp)), 4),
+        "loso_mae_years_ci95": bootstrap_ci(mean_absolute_error, yt, yp),
     }
     print("LOSO metrics:", metrics)
 

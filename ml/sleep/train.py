@@ -22,6 +22,7 @@ MLflow: logs to MLFLOW_TRACKING_URI if set (DagsHub), else no-ops silently.
 import argparse
 import json
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -32,6 +33,10 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from sklearn.metrics import (f1_score, accuracy_score, cohen_kappa_score,
                              confusion_matrix, recall_score)
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ci"))
+import viz  # noqa: E402
+from bootstrap import bootstrap_ci  # noqa: E402
 
 import config as cfg
 from model import create_model
@@ -241,6 +246,7 @@ def main():
         "model": "sleep",
         "eval_set_id": "walch_v1",
         "walch_kappa": round(float(te_k), 4),
+        "walch_kappa_ci95": bootstrap_ci(cohen_kappa_score, L, P),
         "walch_weightedF1": round(float(te_wf1), 4),
         "walch_macroF1": round(float(te_mf1), 4),
         "walch_accuracy": round(float(te_acc), 4),

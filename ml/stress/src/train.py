@@ -41,6 +41,7 @@ from config import load_config, PipelineConfig
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ci"))
 import viz  # noqa: E402
+from bootstrap import bootstrap_ci  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -349,6 +350,8 @@ def train_and_evaluate(train_df: pd.DataFrame, eval_df, cfg: PipelineConfig) -> 
             "heldout_auc": roc_auc_score(ye, qe) if len(set(ye)) > 1 else float("nan"),
             "heldout_accuracy": accuracy_score(ye, (qe >= thr_h).astype(int)),
             "heldout_f1": f1_score(ye, (qe >= thr_h).astype(int), zero_division=0),
+            "heldout_auc_ci95": bootstrap_ci(roc_auc_score, ye, qe,
+                                             groups=eval_df["subject"].values),
         }
         logger.info(f"\n=== HELD-OUT: train {cfg.data.train_on} -> test {cfg.data.eval_on} ===")
         for k, v in heldout.items():
@@ -443,6 +446,7 @@ def write_metrics_json(results: dict, cfg: PipelineConfig, metrics_path: str):
         "model": "stress",
         "eval_set_id": "wesad_v1",
         "heldout_auc": round(float(results.get("heldout_auc", float("nan"))), 4),
+        "heldout_auc_ci95": results.get("heldout_auc_ci95"),
         "heldout_dataset": cfg.data.eval_on,
         "train_datasets": [n for n in cfg.data.train_on.split("+") if n],
         "cv_auc_roc_loso": round(float(results["cv_auc_roc"]), 4),

@@ -32,6 +32,7 @@ from sklearn.metrics import (accuracy_score, precision_score, recall_score,
 warnings.filterwarnings("ignore")
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ci"))
 import viz  # noqa: E402
+from bootstrap import bootstrap_ci  # noqa: E402
 
 AGE_MAP = {
     "20-24": 22, "25-29": 27, "30-34": 32, "35-39": 37, "40-44": 42,
@@ -164,7 +165,8 @@ def main():
     # ---- 5-fold CV (held-out metrics, threshold 0.40) ----
     print("Cross-validating (5-fold)...")
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    preds, truth, probs = [], [], []
+    preds, truth, probs, subj = [], [], [], []
+    subjects = dataset["subject"].values
     for tr, te in cv.split(X, y):
         spw = (y.iloc[tr] == 0).sum() / max((y.iloc[tr] == 1).sum(), 1)
         clf = xgb.XGBClassifier(
@@ -173,14 +175,18 @@ def main():
             reg_lambda=2.0, scale_pos_weight=spw, random_state=42, eval_metric="logloss")
         clf.fit(X.iloc[tr], y.iloc[tr])
         p = clf.predict_proba(X.iloc[te])[:, 1]
-        probs.extend(p); preds.extend((p >= threshold).astype(int)); truth.extend(y.iloc[te])
+        probs.extend(p); preds.extend((p >= threshold).astype(int))
+        truth.extend(y.iloc[te]); subj.extend(subjects[te])
 
+    truth, preds, probs, subj = map(np.array, (truth, preds, probs, subj))
     metrics = {
         "cv_accuracy": round(float(accuracy_score(truth, preds)), 4),
         "cv_precision": round(float(precision_score(truth, preds)), 4),
         "cv_recall": round(float(recall_score(truth, preds)), 4),
         "cv_f1": round(float(f1_score(truth, preds)), 4),
         "cv_auc_roc": round(float(roc_auc_score(truth, probs)), 4),
+        "cv_accuracy_ci95": bootstrap_ci(accuracy_score, truth, preds, groups=subj),
+        "cv_auc_roc_ci95": bootstrap_ci(roc_auc_score, truth, probs, groups=subj),
     }
     print("CV metrics:", metrics)
 
