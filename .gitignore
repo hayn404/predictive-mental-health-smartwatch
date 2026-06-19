@@ -42,18 +42,12 @@ ml/.venv/
 ml/.pytest_cache/
 ml/src/__pycache__/
 ml/tests/__pycache__/
-# Ignore raw datasets under ml/data, but step-wise re-include the small
-# extracted stress feature CSVs (needed by CI training). Git can't re-include a
-# file whose parent dir is excluded, so each level excludes /* then re-includes.
+# Raw datasets under ml/data stay out of git. The extracted feature files are
+# DVC-tracked (DagsHub remote), so git keeps only the small *.dvc pointers.
 ml/data/*
 !ml/data/features/
 ml/data/features/*
-!ml/data/features/stress/
-ml/data/features/stress/*
-!ml/data/features/stress/*.csv
-!ml/data/features/depression/
-ml/data/features/depression/*
-!ml/data/features/depression/*.csv
+!ml/data/features/*.dvc
 ml/**/models/*.joblib
 ml/models/*.joblib
 __pycache__/
@@ -65,14 +59,14 @@ android/
 .env
 
 # Large ML training data (download from the dataset sources; see model cards).
-# Keep the small extracted feature CSVs (focus/bioage) — raw subfolders stay out.
+# Extracted focus/bioage feature CSVs are DVC-tracked -> keep only *.dvc pointers.
 ml/*/data/
 !ml/focus/data/
 ml/focus/data/*
-!ml/focus/data/*.csv
+!ml/focus/data/*.dvc
 !ml/bioage/data/
 ml/bioage/data/*
-!ml/bioage/data/*.csv
+!ml/bioage/data/*.dvc
 # Generated native iOS project (Expo managed workflow)
 /ios/
 # Logs and Office temp/lock files

@@ -43,7 +43,13 @@ jobs:
       - name: Install deps
         run: pip install -r ml/ci/requirements.txt
 
-      # ── CPU models train on this runner (committed feature CSVs) ──
+      - name: Pull feature data (DVC / DagsHub)
+        run: |
+          dvc remote modify --local origin access_key_id     "${{ secrets.DAGSHUB_TOKEN }}"
+          dvc remote modify --local origin secret_access_key "${{ secrets.DAGSHUB_TOKEN }}"
+          dvc pull -q || echo "dvc pull: nothing on the remote yet"
+
+      # ── CPU models train on this runner (feature CSVs pulled from DVC) ──
       - name: Train stress (CPU)
         if: ${{ inputs.model == 'all' || inputs.model == 'stress' }}
         run: |
@@ -79,6 +85,16 @@ jobs:
           if [ "$M" = "all" ] || [ "$M" = "sleep" ];  then run_kaggle sleep;  fi
           if [ "$M" = "all" ] || [ "$M" = "focus" ];  then run_kaggle focus;  fi
           if [ "$M" = "all" ] || [ "$M" = "bioage" ]; then run_kaggle bioage; fi
+
+      - name: Version new feature files (DVC push)
+        run: |
+          for p in ml/data/features/stress ml/data/features/depression \
+                   ml/focus/data/cogwear_features_samsung.csv \
+                   ml/bioage/data/bioage_features_aa.csv \
+                   ml/bioage/data/bioage_features_fantasia.csv; do
+            [ -e "$p" ] && dvc add "$p" || true
+          done
+          dvc push -q || echo "dvc push skipped"
 
       - name: Champion/challenger gate
         id: gate

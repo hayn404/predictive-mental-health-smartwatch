@@ -13,6 +13,5 @@ kaggle>=1.8
 # Figures (confusion/ROC/feature-importance/SHAP) for CPU models on the runner
 shap>=0.44
 
-# Data/experiment versioning (optional — the CI flow uses git + Kaggle, not DVC)
-# dvc[s3]>=3.0
-# dagshub
+# Data/experiment versioning — feature CSVs are DVC-tracked on the DagsHub remote
+dvc[s3]>=3.0
