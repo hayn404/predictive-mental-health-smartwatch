@@ -1,309 +1,142 @@
 """
 Seren — Sleep Stage Classification: Dataset Loader
 ====================================================
-Loads DREAMT dataset, preprocesses signals, and creates
-PyTorch datasets with 30-second windowed epochs.
+Loads the PRE-BUILT, PRE-NORMALIZED feature cache produced by
+prepare_features.py and consumed verbatim by the Kaggle notebook
+(seren_sleep_kaggle.ipynb) v3.2.
 
-Expected data layout:
-  data/dreamt/
-    S01/
-      BVP.csv, ACC.csv, HR.csv, TEMP.csv, labels.csv
-    S02/
-      ...
+Per-night median/MAD normalization is baked into the cache at build time — this
+module does NOT normalize. It only:
+  1. loads bidsleep_features.pkl (train/val) + walch_features.pkl (held-out test)
+  2. slices out the XAI-dead column (immobility_frac)
+  3. appends time_of_night as feature #11
+  4. builds subject-disjoint train/val split + SeqDataset sequences
+  5. computes sqrt-inverse-frequency class weights
+
+Cache pickle format: list of (subject_id, features[N,11], labels[N]) tuples.
+BIDSleep subject ids are "<subject>/<recording>" (e.g. "Bidslab00/3").
 """
 
-import numpy as np
-import pandas as pd
+import pickle
 from pathlib import Path
-from scipy.signal import butter, filtfilt
-from typing import Optional
-from torch.utils.data import Dataset, DataLoader
+
+import numpy as np
 import torch
+from torch.utils.data import Dataset, DataLoader
 
 import config as cfg
 
 
-# ── Signal Loading ─────────────────────────────────────────────
+# ── Feature assembly (mirrors notebook cell 3) ─────────────────
 
-def load_subject_signal(subject_dir: Path, signal_name: str) -> Optional[np.ndarray]:
-    """Load a single signal CSV for one subject."""
-    filepath = subject_dir / f"{signal_name}.csv"
-    if not filepath.exists():
-        return None
-    df = pd.read_csv(filepath)
-    return df.values
+def _slice_dead_features(subjects):
+    """Drop XAI-confirmed dead-weight columns (immobility_frac) from cached feats."""
+    return [(sid, feats[:, cfg.KEEP_CACHE_IDX].astype(np.float32), labs)
+            for sid, feats, labs in subjects]
 
 
-def load_subject_labels(subject_dir: Path) -> Optional[np.ndarray]:
-    """Load sleep stage labels (one per 30-sec epoch)."""
-    filepath = subject_dir / "labels.csv"
-    if not filepath.exists():
-        return None
-    df = pd.read_csv(filepath)
-    if "stage" in df.columns:
-        labels = df["stage"].values.astype(np.int64)
-    elif "label" in df.columns:
-        labels = df["label"].values.astype(np.int64)
-    else:
-        labels = df.iloc[:, -1].values.astype(np.int64)
-    return labels
+def _add_time_of_night(subjects):
+    """Append time_of_night: linear position within the night scaled to [-1, +1].
 
-
-# ── Preprocessing ──────────────────────────────────────────────
-
-def bandpass_filter(signal: np.ndarray, low: float, high: float,
-                    fs: int, order: int = 4) -> np.ndarray:
-    """Apply Butterworth bandpass filter."""
-    nyq = fs / 2.0
-    low_n = low / nyq
-    high_n = high / nyq
-    b, a = butter(order, [low_n, high_n], btype="band")
-    return filtfilt(b, a, signal, axis=0)
-
-
-def compute_acc_magnitude(acc_data: np.ndarray) -> np.ndarray:
-    """Compute acceleration magnitude from 3-axis data."""
-    if acc_data.ndim == 1:
-        return np.abs(acc_data)
-    if acc_data.shape[1] >= 3:
-        return np.sqrt(acc_data[:, 0]**2 + acc_data[:, 1]**2 + acc_data[:, 2]**2)
-    return np.abs(acc_data[:, 0])
-
-
-def z_normalize(signal: np.ndarray) -> np.ndarray:
-    """Per-subject z-normalization."""
-    mean = np.mean(signal)
-    std = np.std(signal)
-    if std < 1e-8:
-        return signal - mean
-    return (signal - mean) / std
-
-
-def is_epoch_valid(bvp_epoch: np.ndarray) -> bool:
-    """Reject epochs with flat/clipped BVP signal."""
-    std = np.std(bvp_epoch)
-    if std < cfg.BVP_CLIP_THRESHOLD:
-        return False
-    flat_samples = np.sum(np.abs(np.diff(bvp_epoch)) < 1e-6)
-    flat_ratio = flat_samples / len(bvp_epoch)
-    return flat_ratio < cfg.MAX_FLAT_RATIO
-
-
-# ── Epoch Extraction ───────────────────────────────────────────
-
-def extract_auxiliary_features(hr_epoch: np.ndarray, acc_mag_epoch: np.ndarray,
-                                temp_epoch: np.ndarray) -> np.ndarray:
-    """Compute 6 auxiliary features for one epoch."""
-    hr_mean = np.mean(hr_epoch) if len(hr_epoch) > 0 else 0.0
-    hr_std = np.std(hr_epoch) if len(hr_epoch) > 1 else 0.0
-    acc_mean = np.mean(acc_mag_epoch) if len(acc_mag_epoch) > 0 else 0.0
-    acc_std = np.std(acc_mag_epoch) if len(acc_mag_epoch) > 1 else 0.0
-    temp_mean = np.mean(temp_epoch) if len(temp_epoch) > 0 else 0.0
-
-    if len(temp_epoch) > 1:
-        t = np.arange(len(temp_epoch), dtype=np.float64)
-        temp_slope = np.polyfit(t, temp_epoch, 1)[0]
-    else:
-        temp_slope = 0.0
-
-    return np.array([hr_mean, hr_std, acc_mean, acc_std, temp_mean, temp_slope],
-                    dtype=np.float32)
-
-
-def process_subject(subject_dir: Path, overlap: float = 0.0):
+    On-device equivalent: 2 * (i / max(1, n_epochs - 1)) - 1 for i in [0, n_epochs).
     """
-    Process one subject: load signals, preprocess, window into epochs.
-
-    Returns:
-        raw_epochs: np.ndarray [N, EPOCH_SAMPLES, 2] (BVP + ACC_mag)
-        aux_features: np.ndarray [N, 6]
-        labels: np.ndarray [N]
-    """
-    # Load signals
-    bvp_raw = load_subject_signal(subject_dir, "BVP")
-    acc_raw = load_subject_signal(subject_dir, "ACC")
-    hr_raw = load_subject_signal(subject_dir, "HR")
-    temp_raw = load_subject_signal(subject_dir, "TEMP")
-    labels = load_subject_labels(subject_dir)
-
-    if bvp_raw is None or acc_raw is None or labels is None:
-        return None, None, None
-
-    # Flatten if single column
-    if bvp_raw.ndim == 2 and bvp_raw.shape[1] == 1:
-        bvp_raw = bvp_raw.flatten()
-    elif bvp_raw.ndim == 2:
-        bvp_raw = bvp_raw[:, 0]
-
-    # Compute ACC magnitude
-    acc_mag = compute_acc_magnitude(acc_raw)
-
-    # Bandpass filter BVP
-    try:
-        bvp_filtered = bandpass_filter(bvp_raw, cfg.BVP_LOW_HZ, cfg.BVP_HIGH_HZ, cfg.SAMPLE_RATE)
-    except Exception:
-        bvp_filtered = bvp_raw
-
-    # Z-normalize per subject
-    bvp_norm = z_normalize(bvp_filtered)
-    acc_norm = z_normalize(acc_mag)
-
-    # Prepare HR and TEMP (lower rate — resample to match epochs)
-    if hr_raw is not None:
-        hr_flat = hr_raw.flatten()
-    else:
-        hr_flat = np.zeros(len(labels) * cfg.EPOCH_SEC)
-
-    if temp_raw is not None:
-        temp_flat = temp_raw.flatten()
-    else:
-        temp_flat = np.zeros(len(labels) * cfg.EPOCH_SEC)
-
-    # Window into epochs
-    stride = int(cfg.EPOCH_SAMPLES * (1 - overlap))
-    num_epochs = min(len(labels), (len(bvp_norm) - cfg.EPOCH_SAMPLES) // stride + 1)
-
-    raw_epochs = []
-    aux_features = []
-    valid_labels = []
-
-    for i in range(num_epochs):
-        start = i * stride
-        end = start + cfg.EPOCH_SAMPLES
-
-        if end > len(bvp_norm) or end > len(acc_norm):
-            break
-
-        bvp_epoch = bvp_norm[start:end]
-        acc_epoch = acc_norm[start:end]
-
-        if not is_epoch_valid(bvp_epoch):
-            continue
-
-        # Stack raw channels: [EPOCH_SAMPLES, 2]
-        raw_epoch = np.stack([bvp_epoch, acc_epoch], axis=-1).astype(np.float32)
-        raw_epochs.append(raw_epoch)
-
-        # Auxiliary features from low-rate signals
-        hr_start = i * cfg.EPOCH_SEC
-        hr_end = hr_start + cfg.EPOCH_SEC
-        hr_epoch = hr_flat[hr_start:min(hr_end, len(hr_flat))]
-
-        temp_start = i * cfg.EPOCH_SEC
-        temp_end = temp_start + cfg.EPOCH_SEC
-        temp_epoch = temp_flat[temp_start:min(temp_end, len(temp_flat))]
-
-        aux = extract_auxiliary_features(hr_epoch, acc_epoch, temp_epoch)
-        aux_features.append(aux)
-        valid_labels.append(labels[i])
-
-    if len(raw_epochs) == 0:
-        return None, None, None
-
-    return (np.array(raw_epochs, dtype=np.float32),
-            np.array(aux_features, dtype=np.float32),
-            np.array(valid_labels, dtype=np.int64))
+    out = []
+    for sid, feats, labs in subjects:
+        n = len(feats)
+        denom = max(1, n - 1)
+        ton = (2.0 * np.arange(n, dtype=np.float32) / denom - 1.0).reshape(-1, 1)
+        out.append((sid, np.concatenate([feats, ton], axis=1).astype(np.float32), labs))
+    return out
 
 
-# ── PyTorch Dataset ────────────────────────────────────────────
+def load_cache(data_dir):
+    """Load + prepare both cache pickles. Returns (bidsleep_nights, walch_subjects)."""
+    data_dir = Path(data_dir)
+    walch_p = data_dir / "walch_features.pkl"
+    bid_p = data_dir / "bidsleep_features.pkl"
+    if not walch_p.exists() or not bid_p.exists():
+        raise FileNotFoundError(
+            f"Missing feature cache. Expected:\n  {bid_p}\n  {walch_p}\n"
+            "Run `dvc pull` (or build via prepare_features.py) first."
+        )
+    with open(walch_p, "rb") as f:
+        walch = pickle.load(f)
+    with open(bid_p, "rb") as f:
+        bid = pickle.load(f)
 
-class SleepStageDataset(Dataset):
-    """PyTorch dataset for sleep stage classification."""
+    walch = _add_time_of_night(_slice_dead_features(walch))
+    bid = _add_time_of_night(_slice_dead_features(bid))
+    fdim = walch[0][1].shape[-1]
+    assert fdim == cfg.NUM_FEATURES, f"feature dim {fdim} != expected {cfg.NUM_FEATURES}"
+    print(f"Loaded BIDSleep: {len(bid)} nights | Walch: {len(walch)} subjects "
+          f"| feature dim = {fdim}")
+    return bid, walch
 
-    def __init__(self, raw_epochs: np.ndarray, aux_features: np.ndarray,
-                 labels: np.ndarray):
-        self.raw_epochs = torch.from_numpy(raw_epochs)      # [N, 3000, 2]
-        self.aux_features = torch.from_numpy(aux_features)  # [N, 6]
-        self.labels = torch.from_numpy(labels)              # [N]
+
+# ── Sequence dataset (mirrors notebook cell 7) ─────────────────
+
+class SeqDataset(Dataset):
+    def __init__(self, subjects, seq_len, stride):
+        self.items = []
+        for _, feats, labs in subjects:
+            n = len(labs)
+            if n < seq_len:
+                continue
+            for s in range(0, n - seq_len + 1, stride):
+                self.items.append((feats[s:s + seq_len], labs[s:s + seq_len]))
 
     def __len__(self):
-        return len(self.labels)
+        return len(self.items)
 
-    def __getitem__(self, idx):
-        raw = self.raw_epochs[idx].permute(1, 0)  # [2, 3000] for Conv1d
-        aux = self.aux_features[idx]
-        label = self.labels[idx]
-        return raw, aux, label
+    def __getitem__(self, i):
+        f, l = self.items[i]
+        return torch.from_numpy(f), torch.from_numpy(l)
 
 
-# ── Dataset Builder ────────────────────────────────────────────
+def build_datasets(data_dir):
+    """Build train/val/test loaders + class weights, exactly like the notebook.
 
-def get_subject_dirs() -> list[Path]:
-    """Find all subject directories in the data folder."""
-    if not cfg.DATA_DIR.exists():
-        raise FileNotFoundError(
-            f"Data directory not found: {cfg.DATA_DIR}\n"
-            f"Download DREAMT dataset and place it at: {cfg.DATA_DIR}"
-        )
-    dirs = sorted([d for d in cfg.DATA_DIR.iterdir() if d.is_dir()])
-    return dirs
-
-
-def build_datasets(val_ratio: float = cfg.VAL_SPLIT, seed: int = cfg.RANDOM_SEED):
+    Returns: (train_loader, val_loader, test_loader, class_weights, info_dict)
     """
-    Load all subjects, split into train/val by subject, return DataLoaders.
+    bid, walch = load_cache(data_dir)
 
-    Returns:
-        train_loader, val_loader, class_weights
-    """
-    subject_dirs = get_subject_dirs()
-    print(f"Found {len(subject_dirs)} subjects in {cfg.DATA_DIR}")
+    # SUBJECT-LEVEL split (not night-level) — night-level split leaks subjects.
+    rng = np.random.default_rng(cfg.RANDOM_SEED)
+    subj_of = [sid.split("/")[0] for sid, _, _ in bid]
+    all_subjects = sorted(set(subj_of))
+    rng.shuffle(all_subjects)
+    n_val_subj = max(1, int(len(all_subjects) * cfg.VAL_SPLIT))
+    val_subjects = set(all_subjects[:n_val_subj])
+    bid_train = [s for s, sub in zip(bid, subj_of) if sub not in val_subjects]
+    bid_val = [s for s, sub in zip(bid, subj_of) if sub in val_subjects]
+    print(f"Subject-disjoint split: {len(all_subjects) - n_val_subj} train subj / "
+          f"{n_val_subj} val subj ({len(bid_train)} train nights / {len(bid_val)} val nights)")
 
-    # Split subjects into train/val
-    rng = np.random.default_rng(seed)
-    indices = rng.permutation(len(subject_dirs))
-    val_count = max(1, int(len(subject_dirs) * val_ratio))
-    val_indices = set(indices[:val_count])
+    train_ds = SeqDataset(bid_train, cfg.SEQ_LEN, cfg.TRAIN_STRIDE)
+    val_ds = SeqDataset(bid_val, cfg.SEQ_LEN, cfg.SEQ_LEN)         # disjoint at eval
+    test_ds = SeqDataset(walch, cfg.SEQ_LEN, cfg.SEQ_LEN)          # disjoint at eval
+    print(f"Train {len(train_ds)} | Val {len(val_ds)} | Test(Walch) {len(test_ds)} sequences")
 
-    train_raw, train_aux, train_labels = [], [], []
-    val_raw, val_aux, val_labels = [], [], []
+    # sqrt-inverse-frequency class weights (softer than full inverse)
+    tr_lab = np.concatenate([l for _, _, l in bid_train])
+    counts = np.bincount(tr_lab, minlength=cfg.NUM_CLASSES).astype(np.float32)
+    inv_sqrt = 1.0 / np.sqrt(np.maximum(counts, 1.0))
+    class_weights = torch.tensor(inv_sqrt / inv_sqrt.sum() * cfg.NUM_CLASSES, dtype=torch.float32)
+    print("Train class counts:", dict(zip(cfg.STAGE_NAMES, counts.astype(int).tolist())))
+    print("Class weights (sqrt):", [round(w, 3) for w in class_weights.tolist()])
 
-    for i, sdir in enumerate(subject_dirs):
-        print(f"  Processing {sdir.name}...", end=" ")
-        overlap = cfg.TRAIN_OVERLAP if i not in val_indices else 0.0
-        raw, aux, labels = process_subject(sdir, overlap=overlap)
+    pin = torch.cuda.is_available()
+    nw = 2 if torch.cuda.is_available() else 0   # workers safe on Kaggle Linux/GPU
+    train_loader = DataLoader(train_ds, batch_size=cfg.BATCH_SIZE, shuffle=True,
+                              num_workers=nw, pin_memory=pin, drop_last=True)
+    val_loader = DataLoader(val_ds, batch_size=cfg.BATCH_SIZE, shuffle=False,
+                            num_workers=nw, pin_memory=pin)
+    test_loader = DataLoader(test_ds, batch_size=cfg.BATCH_SIZE, shuffle=False,
+                             num_workers=nw, pin_memory=pin)
 
-        if raw is None:
-            print("skipped (no valid data)")
-            continue
-
-        print(f"{len(labels)} epochs")
-
-        if i in val_indices:
-            val_raw.append(raw)
-            val_aux.append(aux)
-            val_labels.append(labels)
-        else:
-            train_raw.append(raw)
-            train_aux.append(aux)
-            train_labels.append(labels)
-
-    # Concatenate
-    train_raw = np.concatenate(train_raw, axis=0)
-    train_aux = np.concatenate(train_aux, axis=0)
-    train_labels = np.concatenate(train_labels, axis=0)
-    val_raw = np.concatenate(val_raw, axis=0)
-    val_aux = np.concatenate(val_aux, axis=0)
-    val_labels = np.concatenate(val_labels, axis=0)
-
-    print(f"\nTrain: {len(train_labels)} epochs | Val: {len(val_labels)} epochs")
-    print(f"Class distribution (train): {np.bincount(train_labels, minlength=cfg.NUM_CLASSES)}")
-    print(f"Class distribution (val):   {np.bincount(val_labels, minlength=cfg.NUM_CLASSES)}")
-
-    # Compute class weights (inverse frequency)
-    class_counts = np.bincount(train_labels, minlength=cfg.NUM_CLASSES).astype(np.float32)
-    class_counts = np.maximum(class_counts, 1.0)
-    class_weights = 1.0 / class_counts
-    class_weights = class_weights / class_weights.sum() * cfg.NUM_CLASSES
-    class_weights = torch.from_numpy(class_weights)
-
-    # Create datasets and loaders
-    train_dataset = SleepStageDataset(train_raw, train_aux, train_labels)
-    val_dataset = SleepStageDataset(val_raw, val_aux, val_labels)
-
-    train_loader = DataLoader(train_dataset, batch_size=cfg.BATCH_SIZE,
-                              shuffle=True, num_workers=2, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=cfg.BATCH_SIZE,
-                            shuffle=False, num_workers=2, pin_memory=True)
-
-    return train_loader, val_loader, class_weights
+    info = {
+        "num_train_nights": len(bid_train),
+        "num_val_nights": len(bid_val),
+        "num_test_subjects": len(walch),
+    }
+    return train_loader, val_loader, test_loader, class_weights, info

@@ -1,5 +1,7 @@
 torch==2.3.1
-numpy==2.4.2
+# numpy<2: the seren-sleep-cache pickles were created with numpy 1.x and fail to
+# unpickle under numpy 2.x (the notebook pins numpy<2 for the same reason).
+numpy==1.26.4
 scipy==1.15.3
 scikit-learn==1.7.0
 pandas==2.3.0

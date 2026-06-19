@@ -1,15 +1,19 @@
 """
 Seren ML Pipeline — Step 2: Feature Engineering
 =================================================
-Extracts 29 HRV + biometric features per window from raw signals.
+Extracts HRV + biometric features per window from raw signals.
 These exact same features must be replicated in TypeScript on the device.
 
-Feature groups:
+Feature groups (full extraction):
   - Time-domain HRV (9): meanRR, sdnn, rmssd, pnn50, pnn20, hrMean, hrStd, hrRange, cvRR
   - Frequency-domain HRV (7): vlfPower, lfPower, hfPower, lfHfRatio, totalPower, lfNorm, hfNorm
   - Non-linear HRV (5): sd1, sd2, sd1sd2Ratio, sampleEntropy, dfaAlpha1
   - Skin temperature (4): tempMean, tempSlope, tempStd, tempRange
   - Accelerometer (4): accelMagnitudeMean, accelMagnitudeStd, stepCount, activityType
+
+FEATURE_ORDER (14 features, matches notebook USE_FREQ_DOMAIN=False, USE_MORPHOLOGY=False):
+  Time-domain (9) + Non-linear (5) — frequency and morphology groups excluded.
+  This is the SHAP-reduction optimum and the set shipped in stress_model.json.
 """
 
 import numpy as np
@@ -393,8 +397,17 @@ def compute_accelerometer_features(acc: np.ndarray, fs: int = 32) -> Dict[str, f
 # Master Feature Extraction
 # ============================================================
 
-# Feature names in exact order for model input
+# 14-feature set used for training and on-device inference
+# Matches notebook: USE_FREQ_DOMAIN=False, USE_MORPHOLOGY=False
+# Time-domain HRV (9) + Non-linear HRV (5)
 FEATURE_ORDER = [
+    'meanRR', 'sdnn', 'rmssd', 'pnn50', 'pnn20',
+    'hrMean', 'hrStd', 'hrRange', 'cvRR',
+    'sd1', 'sd2', 'sd1sd2Ratio', 'sampleEntropy', 'dfaAlpha1',
+]
+
+# Full 29-feature set (used for research / SHAP ablation only)
+FEATURE_ORDER_FULL = [
     'meanRR', 'sdnn', 'rmssd', 'pnn50', 'pnn20',
     'hrMean', 'hrStd', 'hrRange', 'cvRR',
     'vlfPower', 'lfPower', 'hfPower', 'lfHfRatio',

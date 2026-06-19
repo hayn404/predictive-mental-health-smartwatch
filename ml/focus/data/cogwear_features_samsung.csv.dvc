@@ -1,0 +1,5 @@
+outs:
+- md5: dc51489a09b0b49f20220a5e57ac3d7d
+  size: 152244
+  hash: md5
+  path: cogwear_features_samsung.csv

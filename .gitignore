@@ -42,7 +42,12 @@ ml/.venv/
 ml/.pytest_cache/
 ml/src/__pycache__/
 ml/tests/__pycache__/
-ml/data/
+# Raw datasets under ml/data stay out of git. The extracted feature files are
+# DVC-tracked (DagsHub remote), so git keeps only the small *.dvc pointers.
+ml/data/*
+!ml/data/features/
+ml/data/features/*
+!ml/data/features/*.dvc
 ml/**/models/*.joblib
 ml/models/*.joblib
 __pycache__/
@@ -53,8 +58,20 @@ wearos/.idea/
 android/
 .env
 
-# Large ML training data (download from the dataset sources; see model cards)
+# CI scratch from the Kaggle orchestrator (kaggle_run.py) — never commit these
+kaggle_out/
+kaggle_kernel/
+kernel_log/
+
+# Large ML training data (download from the dataset sources; see model cards).
+# Extracted focus/bioage feature CSVs are DVC-tracked -> keep only *.dvc pointers.
 ml/*/data/
+!ml/focus/data/
+ml/focus/data/*
+!ml/focus/data/*.dvc
+!ml/bioage/data/
+ml/bioage/data/*
+!ml/bioage/data/*.dvc
 # Generated native iOS project (Expo managed workflow)
 /ios/
 # Logs and Office temp/lock files

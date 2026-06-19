@@ -1,0 +1,6 @@
+outs:
+- md5: 01e565485517d31e30b5f01b8e0853d1.dir
+  size: 1435156
+  nfiles: 3
+  hash: md5
+  path: stress
