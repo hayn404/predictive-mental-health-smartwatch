@@ -38,6 +38,19 @@ PARAMS = dict(objective="binary:logistic", eval_metric="logloss", n_estimators=4
               reg_lambda=2.0, reg_alpha=0.5, gamma=0.2, random_state=42, n_jobs=-1)
 
 
+def load_tuned_params():
+    """Merge the PSO-tuned hyperparameters (ml/focus/models/pso_best_params.json,
+    LOSO-AUC ~0.839) into PARAMS so CI reproduces the deployed model. No-ops if the
+    file is absent (falls back to the hand-set PARAMS above)."""
+    p = Path(__file__).resolve().parents[1] / "models" / "pso_best_params.json"
+    if p.exists():
+        best = json.loads(p.read_text()).get("best_params", {})
+        PARAMS.update(best)
+        print(f"Loaded PSO-tuned params: {best}")
+    else:
+        print("No pso_best_params.json found — using default PARAMS.")
+
+
 def per_user_normalize(df, feats):
     out = df.copy()
     for f in feats:
@@ -138,6 +151,8 @@ def main():
     ap.add_argument("--metrics", default="ml/focus/metrics.json")
     ap.add_argument("--figures", default="ml/focus/figures")
     args = ap.parse_args()
+
+    load_tuned_params()
 
     csv = Path(args.data) / f"cogwear_features_{args.device}.csv"
     if not csv.exists():
