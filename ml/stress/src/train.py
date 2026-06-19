@@ -484,6 +484,28 @@ def apply_params_yaml(cfg: PipelineConfig, params_path: str):
     cfg.data.normalization = str(s.get("normalization", cfg.data.normalization))
 
 
+def _log_figs_mlflow(figs_dir, results):
+    """Log stress figures (+ key metrics) under the 'seren-stress-train' experiment
+    so pull_figures.py finds them. Runs in its own MLflow run because the metrics
+    run from maybe_mlflow_run() is already closed by this point."""
+    uri = os.environ.get("MLFLOW_TRACKING_URI")
+    if not uri or os.environ.get("USE_MLFLOW", "true").lower() != "true":
+        return
+    try:
+        import mlflow
+        mlflow.set_tracking_uri(uri)
+        mlflow.set_experiment("seren-stress-train")
+        with mlflow.start_run(run_name="stress"):
+            for k, v in results.items():
+                if (k.startswith("cv_") or k.startswith("heldout_")) and isinstance(v, (int, float)):
+                    mlflow.log_metric(k, float(v))
+            for p in sorted(Path(figs_dir).glob("*.png")):
+                mlflow.log_artifact(str(p), artifact_path="figures")
+        print("Logged stress figures to MLflow (seren-stress-train).")
+    except Exception as e:
+        print(f"MLflow figure logging skipped ({e}).")
+
+
 def maybe_mlflow_run(results_fn, cfg: PipelineConfig):
     """Run results_fn() inside an MLflow run if a tracking URI is configured."""
     uri = os.environ.get("MLFLOW_TRACKING_URI", cfg.mlflow.tracking_uri)
@@ -552,7 +574,7 @@ def main():
                                title="Stress — Feature Importance")
     viz.shap_summary_fig(results["model"], pd.DataFrame(results["X_scaled"], columns=fcols),
                          str(figs / "shap_summary.png"), title="Stress — SHAP Summary")
-    viz.log_figs_to_mlflow(str(figs))
+    _log_figs_mlflow(figs, results)
 
     logger.info("\n" + "=" * 50)
     logger.info("Training complete!")
