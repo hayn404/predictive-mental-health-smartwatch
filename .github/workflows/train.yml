@@ -49,7 +49,8 @@ jobs:
           dvc remote modify --local origin secret_access_key "${{ secrets.DAGSHUB_TOKEN }}"
           # Pull ONLY the feature files (.dvc), not the dvc.yaml pipeline stages
           # whose model outs are git-tracked (not in the DVC cache).
-          for f in ml/data/features/stress.dvc ml/data/features/depression.dvc ml/data/features/bioage.dvc; do
+          for f in ml/data/features/stress.dvc ml/data/features/depression.dvc \
+                   ml/data/features/bioage.dvc ml/data/features/focus.dvc; do
             [ -f "$f" ] && dvc pull "$f"
           done
           ls -la ml/data/features/ || true
@@ -83,35 +84,32 @@ jobs:
             echo "::warning::bioage feature CSVs not found — extract once on Kaggle (see ml/ci/kaggle_run.py --model bioage) and commit them to ml/data/features/bioage/."
           fi
 
-      # ── Data-heavy models train on Kaggle (GPU sleep / CPU focus) ──
-      # The kernel downloads the PhysioNet datasets, extracts features, trains,
-      # and returns model + metrics + figures + the feature CSVs.
-      - name: Train sleep / focus (Kaggle)
-        if: ${{ inputs.model == 'all' || inputs.model == 'all-but-bioage' || inputs.model == 'sleep' || inputs.model == 'focus' }}
+      - name: Train focus (CPU, from cached features)
+        if: ${{ inputs.model == 'all' || inputs.model == 'all-but-bioage' || inputs.model == 'focus' }}
+        run: |
+          if [ -f ml/data/features/focus/cogwear_features_samsung.csv ]; then
+            python ml/focus/src/train.py --params params.yaml \
+              --data ml/data/features/focus --device samsung \
+              --out assets/ml/focus --metrics ml/focus/metrics.json --figures ml/focus/figures
+          else
+            echo "::warning::focus feature CSV not found in ml/data/features/focus/."
+          fi
+
+      # ── Sleep is the only Kaggle job (needs the GPU for the TCN+BiGRU). Its
+      # feature cache is pulled from DVC inside the kernel — same source as the
+      # CPU models, just trained on a Kaggle T4. ──
+      - name: Train sleep (Kaggle T4 GPU, features via DVC)
+        if: ${{ inputs.model == 'all' || inputs.model == 'all-but-bioage' || inputs.model == 'sleep' }}
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
         run: |
-          set -e
-          run_kaggle () {
-            python ml/ci/kaggle_run.py --model "$1" \
-              --user "${{ secrets.KAGGLE_USERNAME }}" \
-              --repo "${{ github.repository }}" \
-              --ref "${{ github.ref_name }}" --mlflow
-          }
-          M="${{ inputs.model }}"
-          if [ "$M" = "all" ] || [ "$M" = "all-but-bioage" ] || [ "$M" = "sleep" ];  then run_kaggle sleep;  fi
-          if [ "$M" = "all" ] || [ "$M" = "all-but-bioage" ] || [ "$M" = "focus" ];  then run_kaggle focus;  fi
-
-      - name: Version new feature files (DVC push)
-        run: |
-          for p in ml/data/features/stress ml/data/features/depression \
-                   ml/data/features/bioage \
-                   ml/focus/data/cogwear_features_samsung.csv; do
-            [ -e "$p" ] && dvc add "$p" || true
-          done
-          dvc push -q || echo "dvc push skipped"
+          python ml/ci/kaggle_run.py --model sleep \
+            --user "${{ secrets.KAGGLE_USERNAME }}" \
+            --repo "${{ github.repository }}" \
+            --ref "${{ github.ref_name }}" \
+            --dagshub-token "${{ secrets.DAGSHUB_TOKEN }}" --mlflow
 
       - name: Champion/challenger gate
         id: gate

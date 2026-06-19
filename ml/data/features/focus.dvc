@@ -1,0 +1,6 @@
+outs:
+- md5: 376179e56498fa7f6baed9aeb5619117.dir
+  size: 313575
+  nfiles: 2
+  hash: md5
+  path: focus

@@ -1,0 +1,6 @@
+outs:
+- md5: 8b89848b56c0e5f954be15644e04b9de.dir
+  size: 12361279
+  nfiles: 3
+  hash: md5
+  path: sleep

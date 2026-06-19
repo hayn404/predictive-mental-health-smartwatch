@@ -38,16 +38,15 @@ OUT="/kaggle/working"
 
 SLEEP_BODY = '''\
 sh(sys.executable,"-m","pip","install","-q","-r","ml/sleep/requirements.txt")
-sh(sys.executable,"-m","pip","install","-q","-U","onnx2tf","onnx-graphsurgeon","onnxsim","tf_keras")
+sh(sys.executable,"-m","pip","install","-q","-U","onnx2tf","onnx-graphsurgeon","onnxsim","tf_keras","dvc[s3]")
 # torch 2.3.1's torch.onnx import trips on Kaggle's newer onnxscript via beartype
 # type-hints; removing beartype makes those decorators no-ops so the import works.
 subprocess.run([sys.executable,"-m","pip","uninstall","-y","beartype"])
-os.makedirs("ml/data/features/sleep", exist_ok=True)
-print("INPUT:", os.listdir("/kaggle/input") if os.path.isdir("/kaggle/input") else "NO /kaggle/input")
-for fname in ("bidsleep_features.pkl","walch_features.pkl","manifest.json"):
-    hits = glob.glob("/kaggle/input/**/"+fname, recursive=True)
-    print(fname, "->", (hits[:1] or "NOT FOUND"))
-    if hits: shutil.copy(hits[0], "ml/data/features/sleep/"+fname)
+# Pull the sleep feature cache from DVC (DagsHub) -- single source of truth,
+# same as every other model. No Kaggle dataset attached.
+sh("dvc","remote","modify","--local","origin","access_key_id","{dagshub_token}")
+sh("dvc","remote","modify","--local","origin","secret_access_key","{dagshub_token}")
+sh("dvc","pull","ml/data/features/sleep.dvc")
 sh(sys.executable,"ml/sleep/train.py","--params","params.yaml","--data","ml/data/features/sleep",
    "--out","assets/ml/sleep","--metrics","ml/sleep/metrics.json")
 for f in ("assets/ml/sleep/sleep_stage_model.onnx","assets/ml/sleep/sleep_stage_model.onnx.data",
@@ -104,7 +103,7 @@ for p in glob.glob("ml/bioage/figures/*.png"):
 
 # model -> (gpu, kaggle dataset_sources, body, {downloaded_name: repo_dest})
 MODELS = {
-    "sleep": dict(gpu=True, datasets_default="seren-sleep-cache", body=SLEEP_BODY, artifacts={
+    "sleep": dict(gpu=True, datasets_default=None, body=SLEEP_BODY, artifacts={
         "sleep_stage_model.onnx": "assets/ml/sleep/sleep_stage_model.onnx",
         "sleep_stage_model.onnx.data": "assets/ml/sleep/sleep_stage_model.onnx.data",
         "sleep_stage_model.tflite": "assets/ml/sleep/sleep_stage_model.tflite",
@@ -266,6 +265,8 @@ def main():
     ap.add_argument("--repo", required=True, help="owner/name of the GitHub repo")
     ap.add_argument("--ref", default="main")
     ap.add_argument("--cache", default=None, help="Kaggle dataset slug (sleep cache override)")
+    ap.add_argument("--dagshub-token", default=os.environ.get("DAGSHUB_TOKEN", ""),
+                    help="DagsHub token so the kernel can dvc pull features from DagsHub")
     ap.add_argument("--out", default="kaggle_out")
     ap.add_argument("--timeout", type=int, default=43200)
     ap.add_argument("--mlflow", action="store_true")
@@ -276,10 +277,12 @@ def main():
     repo_url = f"https://github.com/{args.repo}.git"     # public repo: anonymous clone
     body = cfg["body"]
     datasets = []
-    if cfg["datasets_default"]:
+    if cfg["datasets_default"]:                          # (legacy Kaggle-dataset path)
         slug = args.cache or f"{args.user}/{cfg['datasets_default']}"
         datasets = [slug]
         body = body.format(cache_name=slug.split("/")[-1])
+    if "{dagshub_token}" in body:                        # sleep pulls features from DVC
+        body = body.format(dagshub_token=args.dagshub_token)
 
     run_src = PREAMBLE.format(repo_url=repo_url, ref=args.ref) + body
 

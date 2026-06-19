@@ -105,7 +105,7 @@ def write_metrics(metrics, path):
     print(f"Wrote {path}")
 
 
-def log_mlflow(metrics, figs, out_dir):
+def log_mlflow(metrics, figs, out_dir, metrics_path=None):
     if not os.environ.get("MLFLOW_TRACKING_URI"):
         print("MLflow disabled (no MLFLOW_TRACKING_URI).")
         return
@@ -123,6 +123,8 @@ def log_mlflow(metrics, figs, out_dir):
             mp = out_dir / "bioage_model.json"
             if mp.exists():
                 mlflow.log_artifact(str(mp))
+            if metrics_path and Path(metrics_path).exists():
+                mlflow.log_artifact(str(metrics_path))   # carries *_ci95
         print("Logged to MLflow.")
     except Exception as e:
         print(f"MLflow logging skipped ({e}).")
@@ -189,7 +191,7 @@ def main():
 
     export_ts(reg, mean, std, metrics, Path(args.out))
     write_metrics(metrics, args.metrics)
-    log_mlflow(metrics, figs, Path(args.out))
+    log_mlflow(metrics, figs, Path(args.out), args.metrics)
     print("\nBio-age training complete.")
 
 
