@@ -59,10 +59,10 @@ for f in ("assets/ml/sleep/sleep_stage_model.onnx","assets/ml/sleep/sleep_stage_
 FOCUS_BODY = '''\
 sh(sys.executable,"-m","pip","install","-q","xgboost","scikit-learn","scipy","pandas","matplotlib","shap","pyyaml")
 COG="https://physionet.org/static/published-projects/consumer-grade-wearables/consumer-grade-wearables-1.0.0.zip"
-sh("wget","-q","-O","/kaggle/working/cog.zip",COG)
-os.makedirs("/kaggle/working/cogx", exist_ok=True)
-sh("unzip","-q","-o","/kaggle/working/cog.zip","-d","/kaggle/working/cogx")
-src=find_dir("/kaggle/working/cogx","pilot")            # dir containing pilot/
+sh("wget","-q","-O","/tmp/cog.zip",COG)                 # /tmp -> not in kernel output
+os.makedirs("/tmp/cogx", exist_ok=True)
+sh("unzip","-q","-o","/tmp/cog.zip","-d","/tmp/cogx")
+src=find_dir("/tmp/cogx","pilot")                       # dir containing pilot/
 exp="ml/focus/data/cogwear/cogwear-can-we-detect-cognitive-effort-with-consumer-grade-wearables-1.0.0"
 os.makedirs(os.path.dirname(exp), exist_ok=True)
 if not os.path.exists(exp): os.symlink(os.path.abspath(src), exp)
@@ -81,13 +81,13 @@ sh(sys.executable,"-m","pip","install","-q","wfdb","xgboost","scikit-learn","sci
 os.makedirs("ml/bioage/data", exist_ok=True)
 FAN="https://physionet.org/static/published-projects/fantasia/fantasia-database-1.0.0.zip"
 AA="https://physionet.org/static/published-projects/autonomic-aging-cardiovascular/autonomic-aging-a-dataset-to-quantify-changes-of-cardiovascular-autonomic-function-during-healthy-aging-1.0.0.zip"
-sh("wget","-q","-O","/kaggle/working/fan.zip",FAN)
-sh("unzip","-q","-o","/kaggle/working/fan.zip","-d","/kaggle/working/fanx")
-fsrc=find_dir("/kaggle/working/fanx","subject-info.csv") if glob.glob("/kaggle/working/fanx/**/subject-info.csv",recursive=True) else os.path.dirname(glob.glob("/kaggle/working/fanx/**/*.hea",recursive=True)[0])
+sh("wget","-q","-O","/tmp/fan.zip",FAN)                 # /tmp -> not in kernel output
+sh("unzip","-q","-o","/tmp/fan.zip","-d","/tmp/fanx")
+fsrc=os.path.dirname(glob.glob("/tmp/fanx/**/*.hea",recursive=True)[0])
 if not os.path.exists("ml/bioage/data/fantasia"): os.symlink(os.path.abspath(fsrc),"ml/bioage/data/fantasia")
-sh("wget","-q","-O","/kaggle/working/aa.zip",AA)
-sh("unzip","-q","-o","/kaggle/working/aa.zip","-d","/kaggle/working/aax")
-asrc=find_dir("/kaggle/working/aax","subject-info.csv")
+sh("wget","-q","-O","/tmp/aa.zip",AA)
+sh("unzip","-q","-o","/tmp/aa.zip","-d","/tmp/aax")
+asrc=find_dir("/tmp/aax","subject-info.csv")
 if not os.path.exists("ml/bioage/data/autonomic_aging"): os.symlink(os.path.abspath(asrc),"ml/bioage/data/autonomic_aging")
 sh(sys.executable,"ml/bioage/src/extract_bioage.py","fantasia")
 sh(sys.executable,"ml/bioage/src/extract_bioage.py","aa")

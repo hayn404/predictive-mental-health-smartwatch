@@ -58,6 +58,11 @@ wearos/.idea/
 android/
 .env
 
+# CI scratch from the Kaggle orchestrator (kaggle_run.py) — never commit these
+kaggle_out/
+kaggle_kernel/
+kernel_log/
+
 # Large ML training data (download from the dataset sources; see model cards).
 # Extracted focus/bioage feature CSVs are DVC-tracked -> keep only *.dvc pointers.
 ml/*/data/
