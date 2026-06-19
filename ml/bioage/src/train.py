@@ -75,7 +75,8 @@ def export_ts(reg, mean, std, metrics, out_dir):
     idx_to_name = {i: n for i, n in enumerate(FEAT)}
     trees = [fix(json.loads(d), idx_to_name) for d in booster.get_dump(dump_format="json")]
     cfg = json.loads(booster.save_config())
-    base = float(cfg["learner"]["learner_model_param"]["base_score"])
+    # XGBoost 3.x serialises base_score as '[5E-1]' -> strip brackets before float()
+    base = float(str(cfg["learner"]["learner_model_param"]["base_score"]).strip("[]"))
     model = {
         "version": "bioage-aa-1.0", "modelType": "xgboost", "task": "regression",
         "applySigmoid": False, "features": FEAT, "baseScore": base,

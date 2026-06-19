@@ -74,7 +74,9 @@ def export_ts(final, raw_df, feats, metrics, device, out_dir):
     idx_to_name = {i: n for i, n in enumerate(feats)}
     trees = [fix_splits(json.loads(d), idx_to_name) for d in booster.get_dump(dump_format="json")]
     cfg = json.loads(booster.save_config())
-    bp = min(max(float(cfg["learner"]["learner_model_param"]["base_score"]), 1e-6), 1 - 1e-6)
+    # XGBoost 3.x serialises base_score as '[5E-1]' -> strip brackets before float()
+    bp = float(str(cfg["learner"]["learner_model_param"]["base_score"]).strip("[]"))
+    bp = min(max(bp, 1e-6), 1 - 1e-6)
     base_margin = math.log(bp / (1 - bp))
     mean = {f: float(raw_df[f].mean()) for f in feats}
     std = {f: float(raw_df[f].std() or 1.0) for f in feats}
