@@ -355,7 +355,7 @@ def train_and_evaluate(train_df: pd.DataFrame, eval_df, cfg: PipelineConfig) -> 
         }
         logger.info(f"\n=== HELD-OUT: train {cfg.data.train_on} -> test {cfg.data.eval_on} ===")
         for k, v in heldout.items():
-            logger.info(f"  {k}: {v:.4f}")
+            logger.info(f"  {k}: {v:.4f}" if isinstance(v, (int, float)) else f"  {k}: {v}")
 
     # ---- Final exported model: GLOBAL StandardScaler (drop-in for the watch) ----
     logger.info("\n=== Training final model on all train data (global norm) ===")
