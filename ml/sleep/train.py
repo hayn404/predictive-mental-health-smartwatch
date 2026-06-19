@@ -34,7 +34,8 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from sklearn.metrics import (f1_score, accuracy_score, cohen_kappa_score,
                              confusion_matrix, recall_score)
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ci"))
+# ml/sleep/train.py is at ml/sleep/ (not ml/<model>/src/), so ml/ is parents[1].
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ci"))
 import viz  # noqa: E402
 from bootstrap import bootstrap_ci  # noqa: E402
 
