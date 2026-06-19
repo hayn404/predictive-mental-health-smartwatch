@@ -16,7 +16,7 @@ on:
       model:
         description: "Which model(s) to train"
         type: choice
-        options: [all, stress, depression, sleep, focus, bioage]
+        options: [all, all-but-bioage, stress, depression, sleep, focus, bioage]
         default: all
 
 permissions:
@@ -56,14 +56,14 @@ jobs:
 
       # ── CPU models train on this runner (feature CSVs pulled from DVC) ──
       - name: Train stress (CPU)
-        if: ${{ inputs.model == 'all' || inputs.model == 'stress' }}
+        if: ${{ inputs.model == 'all' || inputs.model == 'all-but-bioage' || inputs.model == 'stress' }}
         run: |
           python ml/stress/src/train.py --params params.yaml \
             --data ml/data/features/stress --out assets/ml/stress \
             --metrics ml/stress/metrics.json
 
       - name: Train depression (CPU)
-        if: ${{ inputs.model == 'all' || inputs.model == 'depression' }}
+        if: ${{ inputs.model == 'all' || inputs.model == 'all-but-bioage' || inputs.model == 'depression' }}
         run: |
           python ml/depression/src/train.py --params params.yaml \
             --data ml/data/features/depression --out assets/ml/depression \
@@ -87,8 +87,8 @@ jobs:
               --ref "${{ github.ref_name }}" --mlflow
           }
           M="${{ inputs.model }}"
-          if [ "$M" = "all" ] || [ "$M" = "sleep" ];  then run_kaggle sleep;  fi
-          if [ "$M" = "all" ] || [ "$M" = "focus" ];  then run_kaggle focus;  fi
+          if [ "$M" = "all" ] || [ "$M" = "all-but-bioage" ] || [ "$M" = "sleep" ];  then run_kaggle sleep;  fi
+          if [ "$M" = "all" ] || [ "$M" = "all-but-bioage" ] || [ "$M" = "focus" ];  then run_kaggle focus;  fi
           if [ "$M" = "all" ] || [ "$M" = "bioage" ]; then run_kaggle bioage; fi
 
       - name: Version new feature files (DVC push)
