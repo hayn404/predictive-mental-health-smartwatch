@@ -52,8 +52,10 @@ sh(sys.executable,"ml/sleep/train.py","--params","params.yaml","--data","ml/data
    "--out","assets/ml/sleep","--metrics","ml/sleep/metrics.json")
 for f in ("assets/ml/sleep/sleep_stage_model.onnx","assets/ml/sleep/sleep_stage_model.onnx.data",
           "assets/ml/sleep/sleep_stage_model.tflite","assets/ml/sleep/sleep_model_metadata.json",
-          "ml/sleep/metrics.json","ml/sleep/output/training_history.json","ml/sleep/output/training_curves.png"):
+          "ml/sleep/metrics.json","ml/sleep/output/training_history.json"):
     if os.path.exists(f): shutil.copy(f, os.path.join(OUT, os.path.basename(f)))
+for p in glob.glob("ml/sleep/figures/*.png"):
+    shutil.copy(p, os.path.join(OUT, "fig__sleep__"+os.path.basename(p)))
 '''
 
 FOCUS_BODY = '''\
@@ -108,7 +110,6 @@ MODELS = {
         "sleep_stage_model.tflite": "assets/ml/sleep/sleep_stage_model.tflite",
         "sleep_model_metadata.json": "assets/ml/sleep/sleep_model_metadata.json",
         "metrics.json": "ml/sleep/metrics.json",
-        "training_curves.png": "ml/sleep/figures/training_curves.png",
         "training_history.json": "ml/sleep/output/training_history.json",
     }),
     "focus": dict(gpu=False, datasets_default=None, body=FOCUS_BODY, artifacts={

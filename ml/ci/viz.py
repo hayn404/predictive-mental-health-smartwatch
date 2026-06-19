@@ -85,6 +85,19 @@ def regression_scatter_fig(y_true, y_pred, path, unit="yrs", title="Predicted vs
     _save(fig, path)
 
 
+def heatmap_fig(matrix, row_labels, col_labels, path, title="Attribution", cbar_label="mean |IG|"):
+    """Generic labelled heatmap (e.g. per-feature x per-class IG attribution)."""
+    import numpy as _np
+    m = _np.asarray(matrix, dtype=float)
+    fig, ax = plt.subplots(figsize=(1.1 * len(col_labels) + 3, 0.42 * len(row_labels) + 2))
+    im = ax.imshow(m, cmap="viridis", aspect="auto")
+    ax.set_xticks(range(len(col_labels)), col_labels, rotation=30, ha="right")
+    ax.set_yticks(range(len(row_labels)), row_labels)
+    ax.set_title(title)
+    fig.colorbar(im, fraction=0.046, pad=0.04, label=cbar_label)
+    _save(fig, path)
+
+
 def log_figs_to_mlflow(fig_dir):
     """Log every PNG in fig_dir to the active MLflow run (no-op if MLflow off)."""
     uri = os.environ.get("MLFLOW_TRACKING_URI")

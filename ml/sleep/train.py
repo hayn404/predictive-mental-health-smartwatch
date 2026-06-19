@@ -131,6 +131,7 @@ def main():
     ap.add_argument("--data", default="data/sleep")
     ap.add_argument("--out", default="assets/ml/sleep")
     ap.add_argument("--metrics", default="ml/sleep/metrics.json")
+    ap.add_argument("--figures", default="ml/sleep/figures")
     ap.add_argument("--skip-tflite", action="store_true",
                     help="Skip ONNX->TFLite conversion (for envs without onnx2tf/tensorflow)")
     args = ap.parse_args()
@@ -259,8 +260,11 @@ def main():
     # ── Export ONNX + metadata (mirrors notebook cell 17) ──
     export_onnx(model, out_dir, te_mf1, te_wf1, te_k, tracker)
 
-    # ── Training curves ──
-    save_curves(history, cfg.OUTPUT_DIR / "training_curves.png", tracker)
+    # ── Figures: training curves + Integrated-Gradients XAI ──
+    figs = Path(args.figures)
+    figs.mkdir(parents=True, exist_ok=True)
+    save_curves(history, figs / "training_curves.png", tracker)
+    sleep_xai_ig(model, test_loader, device, figs)
 
     # ── ONNX -> TFLite ──
     if not args.skip_tflite:
@@ -312,6 +316,62 @@ def export_onnx(model, out_dir, te_mf1, te_wf1, te_k, tracker):
     print(f"Saved {onnx_path} ({onnx_path.stat().st_size/1e3:.1f} KB) + metadata")
     tracker.log_artifact(onnx_path)
     tracker.log_artifact(out_dir / "sleep_model_metadata.json")
+
+
+def sleep_xai_ig(model, loader, device, figs, max_seqs=96):
+    """Integrated-Gradients XAI for the TCN+BiGRU: per-class x per-feature
+    attribution (which of the 11 features drives each sleep stage). Captum is the
+    right XAI here (SHAP TreeExplainer doesn't apply to a neural net). Wrapped so
+    it can never crash the run."""
+    try:
+        try:
+            from captum.attr import IntegratedGradients
+        except ImportError:
+            import subprocess
+            subprocess.run([sys.executable, "-m", "pip", "install", "-q", "captum"], check=True)
+            from captum.attr import IntegratedGradients
+
+        xm = type(model)().to(device)
+        xm.load_state_dict(model.state_dict())
+        xm.eval()
+        for p in xm.parameters():
+            p.requires_grad = False
+        # cuDNN LSTM backward needs train(); disable cuDNN so eval-mode IG works.
+        torch.backends.cudnn.enabled = False
+
+        xs = []
+        for f, _ in loader:
+            xs.append(f)
+            if sum(b.shape[0] for b in xs) >= max_seqs:
+                break
+        X = torch.cat(xs, 0)[:max_seqs].to(device)
+        baseline = torch.zeros_like(X)   # 0 = per-night median epoch (normalized space)
+
+        class _MeanLogit(nn.Module):
+            def __init__(self, m, c):
+                super().__init__(); self.m, self.c = m, c
+            def forward(self, x):
+                return self.m(x)[:, :, self.c].mean(dim=1)
+
+        feat_imp = np.zeros((cfg.NUM_CLASSES, cfg.NUM_FEATURES), dtype=np.float32)
+        for c in range(cfg.NUM_CLASSES):
+            ig = IntegratedGradients(_MeanLogit(xm, c))
+            attr = ig.attribute(X, baselines=baseline, n_steps=32)   # [N, S, F]
+            feat_imp[c] = attr.abs().mean(dim=(0, 1)).detach().cpu().numpy()
+        torch.backends.cudnn.enabled = True
+
+        # per-class x per-feature attribution heatmap (rows=features, cols=stages)
+        viz.heatmap_fig(feat_imp.T, cfg.FEATURE_NAMES, cfg.STAGE_NAMES,
+                        str(figs / "ig_feature_attribution.png"),
+                        title="Sleep — Integrated Gradients (per-feature x per-stage)")
+        # global per-feature importance (summed over stages)
+        viz.feature_importance_fig(cfg.FEATURE_NAMES, feat_imp.sum(axis=0),
+                                   str(figs / "ig_global_importance.png"),
+                                   title="Sleep — IG global feature attribution", top=cfg.NUM_FEATURES)
+        print("Sleep IG attribution figures written.")
+    except Exception as e:
+        torch.backends.cudnn.enabled = True
+        print(f"Sleep XAI (IG) skipped ({e}).")
 
 
 def save_curves(history, path, tracker):
