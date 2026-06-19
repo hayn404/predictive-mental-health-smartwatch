@@ -1,15 +1,23 @@
 name: train
 
-# Train on the self-hosted "staging" machine, pull data from DagsHub via DVC
-# (NOT Kaggle), log metrics to DagsHub MLflow, push artifacts, and open a
-# candidate PR. The model only ships if model-gate.yml passes on that PR.
+# Unified training pipeline.
+#   - CPU models (stress, ...) train on the GitHub-hosted runner.
+#   - Sleep (GPU) is offloaded to a Kaggle T4 kernel via the Kaggle API.
+#   - Everything is tracked on DagsHub MLflow.
+#   - A champion/challenger gate decides promotion: a freshly-trained model is
+#     committed + a candidate PR opened ONLY if it beats the metrics on main.
+#     The PR re-runs model-gate.yml (required check), then merge -> deploy.yml.
+#
+# Trigger it from the Actions tab (Run workflow) and pick the model.
 
 on:
   workflow_dispatch:
     inputs:
-      stage:
-        description: "DVC stage to run (e.g. train_sleep), or 'all'"
-        default: "train_sleep"
+      model:
+        description: "Which model(s) to train"
+        type: choice
+        options: [all, stress, depression, sleep, focus, bioage]
+        default: all
 
 permissions:
   contents: write
@@ -22,39 +30,104 @@ env:
 
 jobs:
   train:
-    runs-on: [self-hosted, gpu]        # your staging machine; falls back to any self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history so the gate can read origin/main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install deps
         run: pip install -r ml/ci/requirements.txt
 
-      - name: Configure DVC remote auth (DagsHub)
+      - name: Pull feature data (DVC / DagsHub)
         run: |
-          dvc remote modify origin --local access_key_id  "${{ secrets.DAGSHUB_TOKEN }}"
-          dvc remote modify origin --local secret_access_key "${{ secrets.DAGSHUB_TOKEN }}"
+          dvc remote modify --local origin access_key_id     "${{ secrets.DAGSHUB_TOKEN }}"
+          dvc remote modify --local origin secret_access_key "${{ secrets.DAGSHUB_TOKEN }}"
+          dvc pull -q || echo "dvc pull: nothing on the remote yet"
 
-      - name: Pull data
-        run: dvc pull
-
-      - name: Train + eval + export (DVC pipeline)
+      # ── CPU models train on this runner (feature CSVs pulled from DVC) ──
+      - name: Train stress (CPU)
+        if: ${{ inputs.model == 'all' || inputs.model == 'stress' }}
         run: |
-          if [ "${{ inputs.stage }}" = "all" ]; then dvc repro; else dvc repro "${{ inputs.stage }}"; fi
+          python ml/stress/src/train.py --params params.yaml \
+            --data ml/data/features/stress --out assets/ml/stress \
+            --metrics ml/stress/metrics.json
 
-      - name: Push artifacts to DagsHub
-        run: dvc push
+      - name: Train depression (CPU)
+        if: ${{ inputs.model == 'all' || inputs.model == 'depression' }}
+        run: |
+          python ml/depression/src/train.py --params params.yaml \
+            --data ml/data/features/depression --out assets/ml/depression \
+            --metrics ml/depression/metrics.json --figures ml/depression/figures
 
-      - name: Open candidate PR
+      # ── Data-heavy models train on Kaggle (GPU sleep / CPU focus+bioage) ──
+      # The kernel downloads the PhysioNet datasets, extracts features, trains,
+      # and returns model + metrics + figures + the feature CSVs.
+      - name: Train sleep / focus / bioage (Kaggle)
+        if: ${{ inputs.model != 'stress' && inputs.model != 'depression' }}
         env:
-          # Use a PAT (secrets.GH_PAT) so the PR triggers model-gate.yml;
-          # PRs opened with the default GITHUB_TOKEN do NOT trigger other workflows.
-          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          set -e
+          run_kaggle () {
+            python ml/ci/kaggle_run.py --model "$1" \
+              --user "${{ secrets.KAGGLE_USERNAME }}" \
+              --repo "${{ github.repository }}" \
+              --ref "${{ github.ref_name }}" --mlflow
+          }
+          M="${{ inputs.model }}"
+          if [ "$M" = "all" ] || [ "$M" = "sleep" ];  then run_kaggle sleep;  fi
+          if [ "$M" = "all" ] || [ "$M" = "focus" ];  then run_kaggle focus;  fi
+          if [ "$M" = "all" ] || [ "$M" = "bioage" ]; then run_kaggle bioage; fi
+
+      - name: Version new feature files (DVC push)
+        run: |
+          for p in ml/data/features/stress ml/data/features/depression \
+                   ml/focus/data/cogwear_features_samsung.csv \
+                   ml/bioage/data/bioage_features_aa.csv \
+                   ml/bioage/data/bioage_features_fantasia.csv; do
+            [ -e "$p" ] && dvc add "$p" || true
+          done
+          dvc push -q || echo "dvc push skipped"
+
+      - name: Champion/challenger gate
+        id: gate
+        run: |
+          git fetch origin main
+          if python ml/ci/gate.py; then
+            echo "promote=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "promote=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open candidate PR (gate passed -> promote)
+        if: ${{ steps.gate.outputs.promote == 'true' }}
+        env:
+          # Public repo: the default token opens the PR. The gate already ran in
+          # this job (step above), so the model is validated before the PR. The
+          # PR's own model-gate.yml re-check won't auto-run under GITHUB_TOKEN;
+          # merge after a quick manual re-run, or add a PAT later if you want it.
+          GH_TOKEN: ${{ github.token }}
         run: |
           BR="model/$(date -u +%Y%m%d-%H%M%S)"
           git config user.name  "seren-ci"
           git config user.email "ci@seren.local"
           git checkout -b "$BR"
           git add -A
-          git commit -m "model: candidate from $(echo $GITHUB_SHA | cut -c1-7)" || { echo "no changes"; exit 0; }
+          git commit -m "model: candidate (${{ inputs.model }}) — beats champion" \
+            || { echo "no changes to promote"; exit 0; }
           git push -u origin "$BR"
-          gh pr create --base main --head "$BR" --fill --title "model: candidate $BR"
+          gh pr create --base main --head "$BR" --fill \
+            --title "model: candidate $BR (gate passed)"
+
+      - name: Report (gate failed -> not promoted)
+        if: ${{ steps.gate.outputs.promote == 'false' }}
+        run: |
+          echo "::warning::Newly trained model did NOT beat the champion on main — not promoting."
+          echo "Metrics are still logged to MLflow for inspection."

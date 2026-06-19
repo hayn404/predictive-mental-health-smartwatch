@@ -1,0 +1,17 @@
+{
+  "model": "focus",
+  "eval_set_id": "cogwear_loso_v1",
+  "loso_acc": 0.7494,
+  "loso_f1": 0.8175,
+  "loso_mcc": 0.4192,
+  "loso_auc": 0.8141,
+  "gate": {
+    "primary": "loso_auc",
+    "direction": "max",
+    "min_delta": 0.0,
+    "no_regress": [
+      "loso_f1",
+      "loso_mcc"
+    ]
+  }
+}

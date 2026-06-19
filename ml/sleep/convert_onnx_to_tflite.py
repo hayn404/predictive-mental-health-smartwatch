@@ -33,8 +33,11 @@ def convert():
     subprocess.run(
         # -rtpo Erf GeLU: replace Erf/GELU with native TFLite ops (no Flex / Select-TF-ops),
         # so react-native-fast-tflite (standard runtime) can run the model on-device.
+        # -kat features: keep the input shape [1,41,11] absolutely (newer onnx2tf
+        # otherwise transposes 3-D inputs NWC -> [1,11,41], breaking on-device feed).
         [sys.executable, "-m", "onnx2tf", "-i", str(ONNX), "-o", str(WORK),
-         "-ois", f"features:1,{SEQ},{FEAT}", "-rtpo", "Erf", "GeLU", "-osd", "-n"],
+         "-ois", f"features:1,{SEQ},{FEAT}", "-kat", "features",
+         "-rtpo", "Erf", "GeLU", "-osd", "-n"],
         check=True,
     )
     cands = sorted(WORK.glob("*_float32.tflite")) or sorted(WORK.glob("*.tflite"))
