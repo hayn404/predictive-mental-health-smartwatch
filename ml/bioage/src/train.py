@@ -117,7 +117,8 @@ def log_mlflow(metrics, figs, out_dir):
             mlflow.log_params({"dataset": "AutonomicAging", **{k: PARAMS[k] for k in
                               ("n_estimators", "max_depth", "learning_rate")}})
             for k, v in metrics.items():
-                mlflow.log_metric(k, v)
+                if isinstance(v, (int, float)):
+                    mlflow.log_metric(k, v)
             viz.log_figs_to_mlflow(str(figs))
             mp = out_dir / "bioage_model.json"
             if mp.exists():

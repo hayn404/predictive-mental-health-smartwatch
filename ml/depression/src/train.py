@@ -214,7 +214,7 @@ def main():
     write_metrics(metrics, args.metrics)
 
     # ---- MLflow ----
-    log_mlflow(metrics, figs, Path(args.out))
+    log_mlflow(metrics, figs, Path(args.out), args.metrics)
     print("\nDepression training complete.")
 
 
@@ -264,7 +264,7 @@ def write_metrics(metrics, path):
     print(f"Wrote {path}")
 
 
-def log_mlflow(metrics, figs, out_dir):
+def log_mlflow(metrics, figs, out_dir, metrics_path=None):
     uri = os.environ.get("MLFLOW_TRACKING_URI")
     if not uri:
         print("MLflow disabled (no MLFLOW_TRACKING_URI).")
@@ -276,11 +276,14 @@ def log_mlflow(metrics, figs, out_dir):
         with mlflow.start_run(run_name="depression"):
             mlflow.log_params({"dataset": "Depresjon", "decision_threshold": 0.40})
             for k, v in metrics.items():
-                mlflow.log_metric(k, v)
+                if isinstance(v, (int, float)):
+                    mlflow.log_metric(k, v)
             viz.log_figs_to_mlflow(str(figs))
             mp = out_dir / "depression_model.json"
             if mp.exists():
                 mlflow.log_artifact(str(mp))
+            if metrics_path and Path(metrics_path).exists():
+                mlflow.log_artifact(str(metrics_path))   # carries the *_ci95 lists
         print("Logged to MLflow.")
     except Exception as e:
         print(f"MLflow logging skipped ({e}).")

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 """
 Download each model's figures (logged as MLflow artifacts under `figures/`) from
 the DagsHub MLflow into docs/thesis/figures/<model>/ for the thesis.
@@ -54,6 +55,18 @@ def main():
                 shutil.copy(f, dest / f.name)
             got = len(pngs)
             print(f"[{m}] {got} figures <- run {run.info.run_id[:8]} -> {dest}")
+            # also pull metrics.json (carries the *_ci95 confidence intervals).
+            # saved alongside the figures, NOT over the committed champion.
+            try:
+                mloc = mlflow.artifacts.download_artifacts(
+                    run_id=run.info.run_id, artifact_path="metrics.json")
+                shutil.copy(mloc, dest / "metrics.json")
+                mj = json.loads(Path(mloc).read_text())
+                cis = {k: v for k, v in mj.items() if k.endswith("_ci95")}
+                if cis:
+                    print(f"       95% CIs: {cis}")
+            except Exception:
+                pass
             break
         pulled[m] = got
         if not got:

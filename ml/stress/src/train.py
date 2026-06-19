@@ -488,10 +488,11 @@ def apply_params_yaml(cfg: PipelineConfig, params_path: str):
     cfg.data.normalization = str(s.get("normalization", cfg.data.normalization))
 
 
-def _log_figs_mlflow(figs_dir, results):
-    """Log stress figures (+ key metrics) under the 'seren-stress-train' experiment
-    so pull_figures.py finds them. Runs in its own MLflow run because the metrics
-    run from maybe_mlflow_run() is already closed by this point."""
+def _log_figs_mlflow(figs_dir, results, metrics_path=None):
+    """Log stress figures (+ key metrics + the metrics.json file, which carries the
+    *_ci95 confidence intervals) under the 'seren-stress-train' experiment so
+    pull_figures.py finds them. Runs in its own MLflow run because the metrics run
+    from maybe_mlflow_run() is already closed by this point."""
     uri = os.environ.get("MLFLOW_TRACKING_URI")
     if not uri or os.environ.get("USE_MLFLOW", "true").lower() != "true":
         return
@@ -503,9 +504,11 @@ def _log_figs_mlflow(figs_dir, results):
             for k, v in results.items():
                 if (k.startswith("cv_") or k.startswith("heldout_")) and isinstance(v, (int, float)):
                     mlflow.log_metric(k, float(v))
+            if metrics_path and Path(metrics_path).exists():
+                mlflow.log_artifact(str(metrics_path))
             for p in sorted(Path(figs_dir).glob("*.png")):
                 mlflow.log_artifact(str(p), artifact_path="figures")
-        print("Logged stress figures to MLflow (seren-stress-train).")
+        print("Logged stress figures + metrics.json to MLflow (seren-stress-train).")
     except Exception as e:
         print(f"MLflow figure logging skipped ({e}).")
 
@@ -578,7 +581,7 @@ def main():
                                title="Stress — Feature Importance")
     viz.shap_summary_fig(results["model"], pd.DataFrame(results["X_scaled"], columns=fcols),
                          str(figs / "shap_summary.png"), title="Stress — SHAP Summary")
-    _log_figs_mlflow(figs, results)
+    _log_figs_mlflow(figs, results, args.metrics)
 
     logger.info("\n" + "=" * 50)
     logger.info("Training complete!")

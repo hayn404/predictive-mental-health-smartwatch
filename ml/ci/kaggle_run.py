@@ -251,6 +251,7 @@ def log_to_mlflow(model, run_ref):
                         mlflow.log_metric(k, float(v))
                 if m.get("eval_set_id"):
                     mlflow.log_param("eval_set_id", m["eval_set_id"])
+                mlflow.log_artifact(str(mpath))   # metrics.json carries the *_ci95 lists
             for fig in Path(f"ml/{model}/figures").glob("*.png"):
                 mlflow.log_artifact(str(fig), artifact_path="figures")
         print("Logged to MLflow.")
