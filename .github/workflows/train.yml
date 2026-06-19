@@ -47,7 +47,9 @@ jobs:
         run: |
           dvc remote modify --local origin access_key_id     "${{ secrets.DAGSHUB_TOKEN }}"
           dvc remote modify --local origin secret_access_key "${{ secrets.DAGSHUB_TOKEN }}"
-          dvc pull -q || echo "dvc pull: nothing on the remote yet"
+          echo "--- dvc remote ---"; dvc remote list
+          echo "--- dvc pull (verbose) ---"; dvc pull -v
+          echo "--- pulled files ---"; ls -la ml/data/features/stress ml/data/features/depression || true
 
       # ── CPU models train on this runner (feature CSVs pulled from DVC) ──
       - name: Train stress (CPU)
