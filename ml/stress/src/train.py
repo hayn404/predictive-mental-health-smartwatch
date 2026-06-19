@@ -39,6 +39,9 @@ import joblib
 from features import FEATURE_ORDER
 from config import load_config, PipelineConfig
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ci"))
+import viz  # noqa: E402
+
 logger = logging.getLogger(__name__)
 
 
@@ -367,6 +370,10 @@ def train_and_evaluate(train_df: pd.DataFrame, eval_df, cfg: PipelineConfig) -> 
         "feature_cols": feature_cols,
         "importances": importance_dict,
         "best_threshold": best_threshold,
+        "y_true": y,
+        "y_pred": y_pred_all,
+        "y_prob": y_prob_all,
+        "X_scaled": X_scaled,
         **cv_metrics,
         **heldout,
     }
@@ -513,6 +520,7 @@ def main():
     ap.add_argument("--data", default="ml/data/features/stress")
     ap.add_argument("--out", default="assets/ml/stress")
     ap.add_argument("--metrics", default="ml/stress/metrics.json")
+    ap.add_argument("--figures", default="ml/stress/figures")
     args = ap.parse_args()
 
     cfg = load_config(None)
@@ -530,6 +538,21 @@ def main():
     out_dir = Path(args.out)
     export_model_json(results, cfg, out_dir)
     write_metrics_json(results, cfg, args.metrics)
+
+    # ---- Figures (confusion / ROC / importance / SHAP) ----
+    figs = Path(args.figures)
+    fcols = results["feature_cols"]
+    viz.confusion_matrix_fig(confusion_matrix(results["y_true"], results["y_pred"]),
+                             ["Not Stressed", "Stressed"], str(figs / "confusion_matrix.png"),
+                             title="Stress — Confusion Matrix (LOSO)")
+    viz.roc_fig(results["y_true"], results["y_prob"], str(figs / "roc_curve.png"),
+                title="Stress — ROC Curve (LOSO)")
+    viz.feature_importance_fig(fcols, results["model"].feature_importances_,
+                               str(figs / "feature_importance.png"),
+                               title="Stress — Feature Importance")
+    viz.shap_summary_fig(results["model"], pd.DataFrame(results["X_scaled"], columns=fcols),
+                         str(figs / "shap_summary.png"), title="Stress — SHAP Summary")
+    viz.log_figs_to_mlflow(str(figs))
 
     logger.info("\n" + "=" * 50)
     logger.info("Training complete!")
